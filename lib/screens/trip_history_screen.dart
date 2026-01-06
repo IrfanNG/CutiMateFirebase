@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
-import '../data/trip_repository.dart';
 import '../models/trip_model.dart';
+import '../services/trip_service.dart';
 import 'trip_detail_screen.dart';
 
 class TripHistoryScreen extends StatelessWidget {
   const TripHistoryScreen({super.key});
 
-  // CutiMate Branding Colors
   final Color primaryBlue = const Color(0xFF1BA0E2);
   final Color darkNavy = const Color(0xFF1B4E6B);
 
   @override
   Widget build(BuildContext context) {
-    final List<Trip> trips = TripRepository.trips;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F9),
       appBar: AppBar(
@@ -33,28 +30,47 @@ class TripHistoryScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: trips.isEmpty
-          ? _emptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              itemCount: trips.length,
-              itemBuilder: (context, index) {
-                final trip = trips[index];
-                return _tripCard(context, trip);
-              },
-            ),
+
+      body: StreamBuilder<List<Trip>>(
+        stream: TripService.loadUserTrips(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return Center(
+              child: CircularProgressIndicator(color: primaryBlue),
+            );
+          }
+
+          final allTrips = snapshot.data!;
+          final today = DateTime.now();
+
+          // FILTER ONLY PAST TRIPS
+          final pastTrips = allTrips
+              .where((t) => t.endDate.isBefore(
+                    DateTime(today.year, today.month, today.day),
+                  ))
+              .toList();
+
+          if (pastTrips.isEmpty) return _emptyState();
+
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            itemCount: pastTrips.length,
+            itemBuilder: (context, index) {
+              final trip = pastTrips[index];
+              return _tripCard(context, trip);
+            },
+          );
+        },
+      ),
     );
   }
 
-  // ================= TRIP CARD =================
   Widget _tripCard(BuildContext context, Trip trip) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => TripDetailScreen(trip: trip),
-          ),
+          MaterialPageRoute(builder: (_) => TripDetailScreen(trip: trip)),
         );
       },
       child: Container(
@@ -73,7 +89,6 @@ class TripHistoryScreen extends StatelessWidget {
         child: IntrinsicHeight(
           child: Row(
             children: [
-              // Side visual representing a "Timeline" or "Completed" status
               Container(
                 width: 6,
                 decoration: BoxDecoration(
@@ -90,7 +105,6 @@ class TripHistoryScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Badge and Category Row
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -106,9 +120,7 @@ class TripHistoryScreen extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: trip.isGroup
-                                  ? const Color(0xFFEAF5FD)
-                                  : Colors.grey.shade100,
+                              color: trip.isGroup ? const Color(0xFFEAF5FD) : Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
@@ -123,7 +135,6 @@ class TripHistoryScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      // Destination Name
                       Text(
                         trip.groupName.isEmpty ? trip.destination : trip.groupName,
                         style: TextStyle(
@@ -133,7 +144,6 @@ class TripHistoryScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      // Date range with icon
                       Row(
                         children: [
                           Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey.shade400),
@@ -150,7 +160,6 @@ class TripHistoryScreen extends StatelessWidget {
                         ],
                       ),
                       const Divider(height: 24, thickness: 0.8),
-                      // Bottom Info Row
                       Row(
                         children: [
                           _infoChip(Icons.people_outline_rounded, '${trip.travelers} Pax'),
@@ -188,7 +197,6 @@ class TripHistoryScreen extends StatelessWidget {
     );
   }
 
-  // ================= EMPTY STATE =================
   Widget _emptyState() {
     return Center(
       child: Column(

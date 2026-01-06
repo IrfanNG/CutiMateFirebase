@@ -50,87 +50,79 @@ class Trip {
 
   int get days => endDate.difference(startDate).inDays + 1;
 
-  // ---------------- FIRESTORE SAVE ----------------
- Map<String, dynamic> toJson() {
-  return {
-    'ownerUid': ownerUid,
-    'title': title,
-    'destination': destination,
-    'startDate': startDate.millisecondsSinceEpoch,
-    'endDate': endDate.millisecondsSinceEpoch,
-    'travelers': travelers,
-    'transport': transport,
-    'accommodation': accommodation,
-    'budget': budget,
-    'activities': activities,
+  // ---------------- SAVE TO FIRESTORE ----------------
+  Map<String, dynamic> toJson() {
+    return {
+      'ownerUid': ownerUid,
+      'title': title,
+      'destination': destination,
+      'startDate': startDate.millisecondsSinceEpoch,
+      'endDate': endDate.millisecondsSinceEpoch,
+      'travelers': travelers,
+      'transport': transport,
+      'accommodation': accommodation,
+      'budget': budget,
+      'activities': activities,
 
-    'itinerary': itinerary.map((e) => {
-      'title': e.title,
-      'time': e.time,
-      'note': e.note,
-    }).toList(),
+      'itinerary': itinerary.map((e) => e.toMap()).toList(),
+      'expenses': expenses.map((e) => e.toMap()).toList(),
+      'tasks': tasks.map((e) => e.toMap()).toList(),
+      'checklist': checklist.map((e) => e.toMap()).toList(),
+      'messages': messages.map((e) => e.toMap()).toList(),
 
-    'expenses': expenses.map((e) => {
-      'title': e.title,
-      'amount': e.amount,
-    }).toList(),
-
-    'tasks': tasks.map((e) => {
-      'title': e.title,
-      'completed': e.completed,
-    }).toList(),
-
-    'checklist': checklist.map((e) => {
-      'title': e.title,
-      'isChecked': e.isChecked,
-    }).toList(),
-
-    'messages': messages.map((e) => {
-      'sender': e.sender,
-      'message': e.message,
-      'time': e.time.millisecondsSinceEpoch,
-    }).toList(),
-
-    'groupName': groupName,
-    'members': members,
-    'isGroup': isGroup,
-  };
-}
-
-  // ---------------- FIRESTORE LOAD ----------------
-  factory Trip.fromJson(String id, Map<String, dynamic> json) {
-  DateTime parseDate(dynamic value) {
-    if (value == null) return DateTime.now();
-    if (value is Timestamp) return value.toDate();
-    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
-    return DateTime.now();
+      'groupName': groupName,
+      'members': members,
+      'isGroup': isGroup,
+    };
   }
 
-  return Trip(
-    id: id,
-    ownerUid: json['ownerUid'] ?? '',
-    title: json['title'] ?? '',
-    destination: json['destination'] ?? '',
-    startDate: parseDate(json['startDate']),
-    endDate: parseDate(json['endDate']),
-    travelers: json['travelers'] ?? 1,
-    transport: json['transport'] ?? '',
-    accommodation: json['accommodation'] ?? '',
-    budget: (json['budget'] ?? 0).toDouble(),
-    activities: List<String>.from(json['activities'] ?? []),
+  // ---------------- LOAD FROM FIRESTORE ----------------
+  factory Trip.fromJson(String id, Map<String, dynamic> json) {
+    DateTime parseDate(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is Timestamp) return value.toDate();
+      if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+      return DateTime.now();
+    }
 
-    itinerary: const [],
-    expenses: const [],
-    tasks: const [],
-    checklist: const [],
-    messages: const [],
+    return Trip(
+      id: id,
+      ownerUid: json['ownerUid'] ?? '',
+      title: json['title'] ?? '',
+      destination: json['destination'] ?? '',
+      startDate: parseDate(json['startDate']),
+      endDate: parseDate(json['endDate']),
+      travelers: json['travelers'] ?? 1,
+      transport: json['transport'] ?? '',
+      accommodation: json['accommodation'] ?? '',
+      budget: (json['budget'] ?? 0).toDouble(),
+      activities: List<String>.from(json['activities'] ?? []),
 
-    isGroup: json['isGroup'] ?? false,
-    groupName: json['groupName'] ?? '',
-    members: List<String>.from(json['members'] ?? []),
-  );
-}
+      itinerary: (json['itinerary'] as List<dynamic>? ?? [])
+          .map((e) => ItineraryItem.fromMap(Map<String, dynamic>.from(e)))
+          .toList(),
 
+      expenses: (json['expenses'] as List<dynamic>? ?? [])
+          .map((e) => ExpenseItem.fromMap(Map<String, dynamic>.from(e)))
+          .toList(),
+
+      tasks: (json['tasks'] as List<dynamic>? ?? [])
+          .map((e) => TaskItem.fromMap(Map<String, dynamic>.from(e)))
+          .toList(),
+
+      checklist: (json['checklist'] as List<dynamic>? ?? [])
+          .map((e) => ChecklistItem.fromMap(Map<String, dynamic>.from(e)))
+          .toList(),
+
+      messages: (json['messages'] as List<dynamic>? ?? [])
+          .map((e) => ChatMessage.fromMap(Map<String, dynamic>.from(e)))
+          .toList(),
+
+      isGroup: json['isGroup'] ?? false,
+      groupName: json['groupName'] ?? '',
+      members: List<String>.from(json['members'] ?? []),
+    );
+  }
 }
 
 // ================= CHAT =================
@@ -154,7 +146,9 @@ class ChatMessage {
   static ChatMessage fromMap(Map<String, dynamic> map) => ChatMessage(
         sender: map['sender'],
         message: map['message'],
-        time: (map['time'] as Timestamp).toDate(),
+        time: (map['time'] is Timestamp)
+            ? (map['time'] as Timestamp).toDate()
+            : DateTime.fromMillisecondsSinceEpoch(map['time']),
       );
 }
 
@@ -175,7 +169,7 @@ class ChecklistItem {
 
   static ChecklistItem fromMap(Map<String, dynamic> map) => ChecklistItem(
         title: map['title'],
-        isChecked: map['isChecked'],
+        isChecked: map['isChecked'] ?? false,
       );
 }
 
@@ -242,6 +236,6 @@ class TaskItem {
 
   static TaskItem fromMap(Map<String, dynamic> map) => TaskItem(
         title: map['title'],
-        completed: map['completed'],
+        completed: map['completed'] ?? false,
       );
 }
