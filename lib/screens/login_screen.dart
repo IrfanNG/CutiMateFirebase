@@ -32,34 +32,37 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
   Future<void> _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showError("Please enter email and password");
-      return;
-    }
-
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      // success → continue navigation
-    } on FirebaseAuthException catch (e) {
-      String message = "Login failed";
-
-      if (e.code == 'user-not-found') {
-        message = "No account found with this email";
-      } else if (e.code == 'wrong-password') {
-        message = "Incorrect password";
-      } else if (e.code == 'invalid-email') {
-        message = "Invalid email format";
-      } else {
-        message = "Invalid email or password";
-      }
-
-      _showError(message);
-    }
+  if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+    _showError("Please enter email and password");
+    return;
   }
+
+  try {
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
+
+    // SUCCESS → go to Home
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, '/home');
+
+  } on FirebaseAuthException catch (e) {
+    String message = "Login failed";
+
+    if (e.code == 'user-not-found') {
+      message = "No account found with this email";
+    } else if (e.code == 'wrong-password') {
+      message = "Incorrect password";
+    } else if (e.code == 'invalid-email') {
+      message = "Invalid email format";
+    } else {
+      message = "Invalid email or password";
+    }
+
+    _showError(message);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
