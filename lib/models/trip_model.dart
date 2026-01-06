@@ -3,14 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Trip {
   String id;
   String ownerUid;
-  final String title;
-  final String destination;
-  final DateTime startDate;
-  final DateTime endDate;
-  final int travelers;
-  final String transport;
-  final String accommodation;
-  final double budget;
+  String title;
+  String destination;
+  DateTime startDate;
+  DateTime endDate;
+  int travelers;
+  String transport;
+  String accommodation;
+  double budget;
 
   final List<String> activities;
 
@@ -49,6 +49,50 @@ class Trip {
         messages = messages ?? [];
 
   int get days => endDate.difference(startDate).inDays + 1;
+  
+  Trip copyWith({
+  String? id,
+  String? ownerUid,
+  String? title,
+  String? destination,
+  DateTime? startDate,
+  DateTime? endDate,
+  int? travelers,
+  String? transport,
+  String? accommodation,
+  double? budget,
+  List<String>? activities,
+  List<ItineraryItem>? itinerary,
+  List<ExpenseItem>? expenses,
+  List<TaskItem>? tasks,
+  List<ChecklistItem>? checklist,
+  String? groupName,
+  List<String>? members,
+  bool? isGroup,
+  List<ChatMessage>? messages,
+}) {
+  return Trip(
+    id: id ?? this.id,
+    ownerUid: ownerUid ?? this.ownerUid,
+    title: title ?? this.title,
+    destination: destination ?? this.destination,
+    startDate: startDate ?? this.startDate,
+    endDate: endDate ?? this.endDate,
+    travelers: travelers ?? this.travelers,
+    transport: transport ?? this.transport,
+    accommodation: accommodation ?? this.accommodation,
+    budget: budget ?? this.budget,
+    activities: activities ?? this.activities,
+    itinerary: itinerary ?? this.itinerary,
+    expenses: expenses ?? this.expenses,
+    tasks: tasks ?? this.tasks,
+    checklist: checklist ?? this.checklist,
+    groupName: groupName ?? this.groupName,
+    members: members ?? this.members,
+    isGroup: isGroup ?? this.isGroup,
+    messages: messages ?? this.messages,
+  );
+}
 
   // ---------------- SAVE TO FIRESTORE ----------------
   Map<String, dynamic> toJson() {
