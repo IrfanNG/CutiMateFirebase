@@ -15,54 +15,61 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _loading = false;
 
-  void _showError(String msg) {
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text("Login Failed"),
-      content: Text(msg),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("OK"),
-        ),
-      ],
-    ),
-  );
-}
-
   Future<void> _login() async {
-  if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-    _showError("Please enter email and password");
-    return;
-  }
-
-  try {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-    );
-
-    // SUCCESS → go to Home
-    if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/home');
-
-  } on FirebaseAuthException catch (e) {
-    String message = "Login failed";
-
-    if (e.code == 'user-not-found') {
-      message = "No account found with this email";
-    } else if (e.code == 'wrong-password') {
-      message = "Incorrect password";
-    } else if (e.code == 'invalid-email') {
-      message = "Invalid email format";
-    } else {
-      message = "Invalid email or password";
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      _showAlert('Please fill all fields');
+      return;
     }
 
-    _showError(message);
+    try {
+      setState(() => _loading = true);
+
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } on FirebaseAuthException catch (e) {
+      String message = 'Login failed';
+
+      if (e.code == 'user-not-found') {
+        message = 'No account found with this email';
+      } else if (e.code == 'wrong-password') {
+        message = 'Incorrect password';
+      } else if (e.code == 'invalid-email') {
+        message = 'Invalid email format';
+      }
+
+      _showAlert(message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
-}
+
+  void _showAlert(String text) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Login Failed'),
+        content: Text(text),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'OK',
+              style: TextStyle(color: Color(0xFF1BA0E2)),
+            ),
+          )
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               children: [
                 const SizedBox(height: 60),
-                // Logo Icon
+
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -100,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // App Name
+
                 const Text(
                   'CutiMate',
                   style: TextStyle(
@@ -114,12 +121,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   'Your ultimate holiday partner',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Color(0xFF1BA0E2),
+                    color: Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 50),
-                
-                // Email Field
+
                 TextField(
                   controller: _emailController,
                   decoration: InputDecoration(
@@ -139,7 +145,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Password Field
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
@@ -158,10 +163,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 32),
 
-                // Login Button
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -186,10 +190,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
 
-                // Footer
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
