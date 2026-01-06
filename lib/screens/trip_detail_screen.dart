@@ -312,53 +312,123 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
   // -------- BUDGET --------
   Widget _budget() {
-    final totalSpent =
-        expenses.fold(0.0, (sum, e) => sum + e.amount);
+    final totalSpent = expenses.fold(0.0, (sum, e) => sum + e.amount);
+    final remaining = widget.trip.budget - totalSpent;
     final perPerson = widget.trip.travelers == 0
         ? 0.0
         : totalSpent / widget.trip.travelers;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [primaryBlue, darkNavy]),
-              borderRadius: BorderRadius.circular(24)),
-          child: Column(
+      child: Column(
+        children: [
+          // ===== SUMMARY CARD =====
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [primaryBlue, darkNavy]),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: darkNavy.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                )
+              ],
+            ),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Total Expenditure",
-                    style: TextStyle(
-                        color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 4),
-                Text("RM ${totalSpent.toStringAsFixed(2)}",
+                const Text(
+                  "Trip Budget Summary",
+                  style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+
+                // TOTAL BUDGET
+                Text(
+                  "Total Budget: RM ${widget.trip.budget.toStringAsFixed(2)}",
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700),
+                ),
+
+                const SizedBox(height: 6),
+
+                // TOTAL SPENT
+                Text(
+                  "Total Spent: RM ${totalSpent.toStringAsFixed(2)}",
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700),
+                ),
+
+                const SizedBox(height: 6),
+
+                // REMAINING
+                Text(
+                  "Remaining: RM ${remaining.toStringAsFixed(2)}",
+                  style: TextStyle(
+                    color: remaining >= 0 ? Colors.lightGreenAccent : Colors.redAccent,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // COST SPLIT
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    "Each person pays: RM ${perPerson.toStringAsFixed(2)}",
                     style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900)),
-                const SizedBox(height: 16),
-                Text("Average RM ${perPerson.toStringAsFixed(2)} / person",
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 12)),
-              ]),
-        ),
-        const SizedBox(height: 20),
-        if (expenses.isEmpty)
-          _emptyState("No expenses recorded",
-              Icons.account_balance_wallet_outlined)
-        else
-          ...expenses.map((e) => Card(
-                child: ListTile(
-                  title: Text(e.title),
-                  trailing: Text(
-                      "RM ${e.amount.toStringAsFixed(2)}"),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13),
+                  ),
                 ),
-              ))
-      ]),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ===== EXPENSE LIST =====
+          if (expenses.isEmpty)
+            _emptyState("No expenses recorded",
+                Icons.account_balance_wallet_outlined)
+          else
+            ...expenses.map(
+              (e) => Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                child: ListTile(
+                  title: Text(e.title,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  trailing: Text(
+                    "RM ${e.amount.toStringAsFixed(2)}",
+                    style: TextStyle(
+                        color: darkNavy, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -487,6 +557,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             () => _inviteMember(sheetContext)),
         _actionTile(Icons.checklist_rounded, "Add Checklist",
             () => _addChecklist(sheetContext)),
+        _actionTile(Icons.task_alt_rounded, "Add New Task",
+            () => _addTask(sheetContext)),
         ],
       ),
     );
@@ -632,5 +704,51 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     ),
   );
 }
+void _addTask(BuildContext sheetContext) {
+  final task = TextEditingController();
 
+  showDialog(
+    context: sheetContext,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text("Add New Task"),
+      content: TextField(
+        controller: task,
+        decoration: const InputDecoration(labelText: "Task name"),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            if (task.text.trim().isEmpty) return;
+
+            // Update UI
+            setState(() {
+              tasks.add(
+                TaskItem(
+                  title: task.text.trim(),
+                  completed: false,
+                ),
+              );
+            });
+
+            // Save to Firestore
+            await FirebaseFirestore.instance
+                .collection('trips')
+                .doc(widget.trip.id)
+                .update({
+              'tasks': tasks.map((t) => t.toMap()).toList(),
+            });
+
+            Navigator.pop(dialogContext);  // close dialog
+            Navigator.pop(sheetContext);   // close bottom sheet
+          },
+          child: const Text("Save"),
+        ),
+      ],
+    ),
+  );
+}
 }
