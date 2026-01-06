@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "245769007460",
+    "project_id": "cutimate-97bd4",
+    "storage_bucket": "cutimate-97bd4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:245769007460:android:31ae7a16292e9c325a8a71",
+        "android_client_info": {
+          "package_name": "com.example.cutimateapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYO1XS6X8q03tKsnivlELoguAvr3lwQ9M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
