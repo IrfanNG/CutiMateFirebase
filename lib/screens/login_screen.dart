@@ -15,38 +15,50 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _loading = false;
 
+  void _showError(String msg) {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text("Login Failed"),
+      content: Text(msg),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("OK"),
+        ),
+      ],
+    ),
+  );
+}
+
   Future<void> _login() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showMessage('Please fill all fields');
+      _showError("Please enter email and password");
       return;
     }
 
     try {
-      setState(() => _loading = true);
-
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      // success → continue navigation
     } on FirebaseAuthException catch (e) {
-      _showMessage(e.message ?? 'Login failed');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+      String message = "Login failed";
 
-  void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(text),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
+      if (e.code == 'user-not-found') {
+        message = "No account found with this email";
+      } else if (e.code == 'wrong-password') {
+        message = "Incorrect password";
+      } else if (e.code == 'invalid-email') {
+        message = "Invalid email format";
+      } else {
+        message = "Invalid email or password";
+      }
+
+      _showError(message);
+    }
   }
 
   @override
