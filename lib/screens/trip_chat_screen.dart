@@ -25,12 +25,12 @@ class _TripChatScreenState extends State<TripChatScreen> {
     }
   }
 
+  // SEND MESSAGE
   Future<void> _sendMessage() async {
     if (_controller.text.trim().isEmpty) return;
 
     final user = FirebaseAuth.instance.currentUser!;
     final message = _controller.text.trim();
-
     _controller.clear();
 
     await FirebaseFirestore.instance
@@ -42,9 +42,28 @@ class _TripChatScreenState extends State<TripChatScreen> {
       "senderUid": user.uid,
       "senderName": user.email,
       "timestamp": FieldValue.serverTimestamp(),
+      "seenBy": [user.uid], // sender sees it already
     });
 
     Future.delayed(const Duration(milliseconds: 200), _scrollToBottom);
+  }
+
+  // MARK MESSAGES AS SEEN
+  Future<void> _markMessagesSeen(List<QueryDocumentSnapshot> docs) async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final batch = FirebaseFirestore.instance.batch();
+
+    for (var d in docs) {
+      final data = d.data() as Map<String, dynamic>;
+
+      if (data["seenBy"] == null || !(data["seenBy"] as List).contains(uid)) {
+        batch.update(d.reference, {
+          "seenBy": FieldValue.arrayUnion([uid])
+        });
+      }
+    }
+
+    await batch.commit();
   }
 
   @override
@@ -60,9 +79,7 @@ class _TripChatScreenState extends State<TripChatScreen> {
           children: [
             Text('Trip Group Chat',
                 style: TextStyle(
-                    color: darkNavy,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16)),
+                    color: darkNavy, fontWeight: FontWeight.bold, fontSize: 16)),
             Text(
               '${widget.trip.destination} • ${widget.trip.travelers} pax',
               style: const TextStyle(color: Colors.grey, fontSize: 11),
@@ -80,7 +97,7 @@ class _TripChatScreenState extends State<TripChatScreen> {
     );
   }
 
-  // ================= REALTIME MESSAGE STREAM =================
+  // ================= STREAM =================
   Widget _messageStream() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -96,6 +113,9 @@ class _TripChatScreenState extends State<TripChatScreen> {
         }
 
         final docs = snapshot.data!.docs;
+
+        // 🔥 Mark seen
+        _markMessagesSeen(docs);
 
         if (docs.isEmpty) {
           return Center(
@@ -116,8 +136,7 @@ class _TripChatScreenState extends State<TripChatScreen> {
 
         return ListView.builder(
           controller: _scrollController,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
@@ -129,6 +148,8 @@ class _TripChatScreenState extends State<TripChatScreen> {
               text: data["text"] ?? "",
               time: (data["timestamp"] as Timestamp?)?.toDate(),
               isMe: isMe,
+              seenBy: data["seenBy"] ?? [],
+              isLastMine: isMe && index == docs.length - 1,
             );
           },
         );
@@ -137,63 +158,84 @@ class _TripChatScreenState extends State<TripChatScreen> {
   }
 
   // ================= CHAT BUBBLE =================
-  Widget _chatBubble(
-      {required String sender,
-      required String text,
-      DateTime? time,
-      required bool isMe}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment:
-            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          if (!isMe)
-            Padding(
-              padding: const EdgeInsets.only(left: 8, bottom: 4),
-              child: Text(sender,
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: darkNavy.withOpacity(0.7))),
-            ),
-
-          Row(
+  Widget _chatBubble({
+    required String sender,
+    required String text,
+    DateTime? time,
+    required bool isMe,
+    List<dynamic>? seenBy,
+    required bool isLastMine,
+  }) {
+    return Column(
+      crossAxisAlignment:
+          isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
             mainAxisAlignment:
                 isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
             children: [
               if (isMe && time != null) _time(time),
               const SizedBox(width: 6),
-
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.7),
-                decoration: BoxDecoration(
-                  color: isMe ? primaryBlue : Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(20),
-                    topRight: const Radius.circular(20),
-                    bottomLeft:
-                        Radius.circular(isMe ? 20 : 4),
-                    bottomRight:
-                        Radius.circular(isMe ? 4 : 20),
-                  ),
-                ),
-                child: Text(
-                  text,
-                  style: TextStyle(
-                      color: isMe ? Colors.white : darkNavy,
-                      fontSize: 15),
-                ),
-              ),
-
+              _bubble(text, isMe),
               const SizedBox(width: 6),
               if (!isMe && time != null) _time(time),
             ],
+          ),
+        ),
+
+        /// --- SEEN INDICATOR ---
+        if (isMe && isLastMine)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(
+              _seenText(seenBy),
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          )
+      ],
+    );
+  }
+
+  String _seenText(List<dynamic>? seenBy) {
+    if (seenBy == null) return "";
+
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final others = seenBy.where((id) => id != uid).toList();
+
+    if (others.isEmpty) return "Delivered";
+    if (others.length == 1) return "Seen";
+    return "Seen by ${others.length}";
+  }
+
+  Widget _bubble(String text, bool isMe) {
+    return Container(
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isMe ? primaryBlue : Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(20),
+          topRight: const Radius.circular(20),
+          bottomLeft: Radius.circular(isMe ? 20 : 4),
+          bottomRight: Radius.circular(isMe ? 4 : 20),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
           )
         ],
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: isMe ? Colors.white : darkNavy,
+          fontSize: 15,
+          height: 1.4,
+        ),
       ),
     );
   }
@@ -206,7 +248,7 @@ class _TripChatScreenState extends State<TripChatScreen> {
         style: const TextStyle(fontSize: 10, color: Colors.grey));
   }
 
-  // ================= INPUT =================
+  // ================= INPUT BAR =================
   Widget _inputBar() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
