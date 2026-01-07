@@ -958,25 +958,78 @@ void _editExpense(int index) {
             ));
   }
 
-  void _inviteMember(BuildContext c) {
-    final e = TextEditingController();
+  void _inviteMember(BuildContext ctx) {
+    final emailController = TextEditingController();
 
     showDialog(
-        context: c,
-        builder: (_) => AlertDialog(
-              title: const Text("Invite Member"),
-              content: TextField(controller: e),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(c), child: const Text("Cancel")),
-                ElevatedButton(
-                    onPressed: () async {
-                      setState(() => members.add(e.text));
-                      await _saveToFirestore();
-                      Navigator.pop(c);
-                    },
-                    child: const Text("Add"))
-              ],
-            ));
+      context: ctx,
+      builder: (_) => AlertDialog(
+        title: const Text("Invite Member"),
+        content: TextField(
+          controller: emailController,
+          decoration: const InputDecoration(labelText: "Member Email"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+
+              if (email.isEmpty) return;
+
+              // 🔒 Prevent duplicates
+              if (members.contains(email)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("User is already in this trip")),
+                );
+                return;
+              }
+
+              try {
+                // ✅ Check if user exists in Firebase Auth
+                final userQuery = await FirebaseFirestore.instance
+                    .collection("users")
+                    .where("email", isEqualTo: email)
+                    .limit(1)
+                    .get();
+
+                if (userQuery.docs.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("User does not exist")),
+                  );
+                  return;
+                }
+
+                // Add to local UI
+                setState(() => members.add(email));
+
+                // Save to Firestore
+                await FirebaseFirestore.instance
+                    .collection("trips")
+                    .doc(widget.trip.id)
+                    .update({
+                  "members": members,
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("$email added to trip")),
+                );
+
+                Navigator.pop(ctx);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Error: $e")),
+                );
+              }
+            },
+            child: const Text("Add"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _addChecklist(BuildContext c) {
