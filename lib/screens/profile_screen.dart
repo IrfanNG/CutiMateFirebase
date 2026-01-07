@@ -5,6 +5,7 @@ import 'login_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/trip_service.dart';
 import '../models/trip_model.dart';
+import 'package:rxdart/rxdart.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onBack;
@@ -45,6 +46,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     }
   }
+  
+  Stream<List<Trip>> _loadProfileTrips() {
+  final user = FirebaseAuth.instance.currentUser!;
+  final email = user.email!;
+
+  final ownedTrips = FirebaseFirestore.instance
+      .collection('trips')
+      .where('ownerUid', isEqualTo: user.uid)
+      .snapshots();
+
+  final invitedTrips = FirebaseFirestore.instance
+      .collection('trips')
+      .where('members', arrayContains: email)
+      .snapshots();
+
+  return Rx.combineLatest2<QuerySnapshot, QuerySnapshot, List<Trip>>(
+    ownedTrips,
+    invitedTrips,
+    (a, b) {
+      final docs = [...a.docs, ...b.docs];
+
+      // remove duplicates
+      final unique = {
+        for (var d in docs) d.id: d,
+      }.values.toList();
+
+      return unique
+          .map((d) =>
+              Trip.fromJson(d.id, d.data() as Map<String, dynamic>))
+          .toList();
+    },
+  );
+}
 
   // 🔐 ASK PASSWORD DIALOG
   Future<String?> _askPassword() async {
@@ -80,15 +114,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: bgLight,
       body: StreamBuilder<List<Trip>>(
-        stream: TripService.loadUserTrips(),
+        stream: _loadProfileTrips(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting || loadingUser) {
+          if (!snapshot.hasData || loadingUser) {
             return Center(child: CircularProgressIndicator(color: primaryBlue));
           }
 
-          final trips = snapshot.data ?? [];
+          final trips = snapshot.data!;
           final groupTripsCount = trips.where((t) => t.isGroup).length;
-          final destinationsCount = trips.map((t) => t.destination).toSet().length;
+          final destinationsCount =
+              trips.map((t) => t.destination).toSet().length;
 
           return SingleChildScrollView(
             child: Column(

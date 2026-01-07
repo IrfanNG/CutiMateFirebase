@@ -4,6 +4,7 @@ import '../models/trip_model.dart';
 import 'trip_chat_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'edit_trip_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class TripDetailScreen extends StatefulWidget {
   final Trip trip;
@@ -738,18 +739,153 @@ void _editExpense(int index) {
 
 
   // ================= GROUP =================
-  Widget _group() => Column(children: [
-        ...members.map((m) => Card(
+  Widget _group() {
+    final user = FirebaseAuth.instance.currentUser!;
+    final bool isOwner = widget.trip.ownerUid == user.uid;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          ...members.map((m) {
+            final bool memberIsOwner = m == widget.trip.ownerUid;
+
+            return Card(
               child: ListTile(
-                  leading: CircleAvatar(child: Text(m[0].toUpperCase())),
-                  title: Text(m)),
-            )),
-        ElevatedButton.icon(
+                leading: CircleAvatar(
+                  child: Text(m[0].toUpperCase()),
+                ),
+                title: Text(m),
+
+                trailing: memberIsOwner
+                    ? const Text(
+                        "Owner",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    :
+                    // Only owner can remove members
+                    isOwner
+                        ? IconButton(
+                            icon: const Icon(Icons.remove_circle,
+                                color: Colors.red),
+                            onPressed: () => _confirmRemoveMember(m),
+                          )
+                        : null,
+              ),
+            );
+          }).toList(),
+
+          const SizedBox(height: 20),
+
+          // Only OWNER can invite members
+          if (isOwner)
+            ElevatedButton.icon(
+              onPressed: () => _inviteMember(context),
+              icon: const Icon(Icons.person_add),
+              label: const Text("Invite Member"),
+            ),
+
+          // Only PARTICIPANT sees Leave Group
+          if (!isOwner) ...[
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              onPressed: _leaveGroup,
+              icon: const Icon(Icons.logout),
+              label: const Text("Leave Group"),
+            ),
+          ],
+
+          const SizedBox(height: 10),
+
+          ElevatedButton.icon(
             onPressed: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => TripChatScreen(trip: widget.trip))),
+              context,
+              MaterialPageRoute(
+                builder: (_) => TripChatScreen(trip: widget.trip),
+              ),
+            ),
             icon: const Icon(Icons.chat),
-            label: const Text("Enter Group Chat"))
-      ]);
+            label: const Text("Enter Group Chat"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _leaveGroup() async {
+  final user = FirebaseAuth.instance.currentUser!;
+  final email = user.email!;
+
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text("Leave Group?"),
+      content: const Text("You will lose access to this trip."),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel")),
+        ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Leave")),
+      ],
+    ),
+  );
+
+  if (confirm != true) return;
+
+  setState(() {
+    members.remove(email);
+  });
+
+  await FirebaseFirestore.instance
+      .collection("trips")
+      .doc(widget.trip.id)
+      .update({
+    "members": members,
+  });
+
+  if (mounted) Navigator.pop(context);
+}
+
+void _confirmRemoveMember(String email) {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text("Remove Member"),
+      content: Text("Remove $email from this trip?"),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            setState(() {
+              members.remove(email);
+            });
+
+            await FirebaseFirestore.instance
+                .collection("trips")
+                .doc(widget.trip.id)
+                .update({
+              "members": members,
+            });
+
+            Navigator.pop(context);
+          },
+          child: const Text("Remove"),
+        ),
+      ],
+    ),
+  );
+}
 
   // ================= CHECKLIST =================
   Widget _checklist() {
@@ -959,6 +1095,27 @@ void _editExpense(int index) {
   }
 
   void _inviteMember(BuildContext ctx) {
+    // ❗ Check if group is already full
+    if (members.length >= widget.trip.travelers) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Group is Full"),
+          content: Text(
+            "You already have ${members.length} members.\n"
+            "Trip pax limit is ${widget.trip.travelers}.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            )
+          ],
+        ),
+      );
+      return;
+    }
+
     final emailController = TextEditingController();
 
     showDialog(
@@ -971,61 +1128,46 @@ void _editExpense(int index) {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
-          ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancel")),
+
           ElevatedButton(
             onPressed: () async {
               final email = emailController.text.trim();
-
               if (email.isEmpty) return;
 
-              // 🔒 Prevent duplicates
-              if (members.contains(email)) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("User is already in this trip")),
+              // 🔒 Double safety check (in case of race conditions)
+              if (members.length >= widget.trip.travelers) {
+                Navigator.pop(ctx);
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text("Group is Full"),
+                    content: Text(
+                      "Cannot invite more members.\n"
+                      "Pax limit: ${widget.trip.travelers}",
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("OK"),
+                      )
+                    ],
+                  ),
                 );
                 return;
               }
 
-              try {
-                // ✅ Check if user exists in Firebase Auth
-                final userQuery = await FirebaseFirestore.instance
-                    .collection("users")
-                    .where("email", isEqualTo: email)
-                    .limit(1)
-                    .get();
+              setState(() => members.add(email));
 
-                if (userQuery.docs.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("User does not exist")),
-                  );
-                  return;
-                }
+              await FirebaseFirestore.instance
+                  .collection("trips")
+                  .doc(widget.trip.id)
+                  .update({"members": members});
 
-                // Add to local UI
-                setState(() => members.add(email));
-
-                // Save to Firestore
-                await FirebaseFirestore.instance
-                    .collection("trips")
-                    .doc(widget.trip.id)
-                    .update({
-                  "members": members,
-                });
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("$email added to trip")),
-                );
-
-                Navigator.pop(ctx);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Error: $e")),
-                );
-              }
+              Navigator.pop(ctx);
             },
-            child: const Text("Add"),
+            child: const Text("Invite"),
           ),
         ],
       ),

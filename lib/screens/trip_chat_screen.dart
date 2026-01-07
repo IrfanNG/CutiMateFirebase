@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/trip_model.dart';
 
 class TripChatScreen extends StatefulWidget {
@@ -14,41 +16,35 @@ class _TripChatScreenState extends State<TripChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  // Branding Palette
   final Color primaryBlue = const Color(0xFF1BA0E2);
   final Color darkNavy = const Color(0xFF1B4E6B);
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-  }
-
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     if (_controller.text.trim().isEmpty) return;
 
-    setState(() {
-      widget.trip.messages.add(
-        ChatMessage(
-          sender: 'You',
-          message: _controller.text.trim(),
-          time: DateTime.now(),
-        ),
-      );
-    });
+    final user = FirebaseAuth.instance.currentUser!;
+    final message = _controller.text.trim();
 
     _controller.clear();
-    Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+
+    await FirebaseFirestore.instance
+        .collection('trips')
+        .doc(widget.trip.id)
+        .collection('messages')
+        .add({
+      "text": message,
+      "senderUid": user.uid,
+      "senderName": user.email,
+      "timestamp": FieldValue.serverTimestamp(),
+    });
+
+    Future.delayed(const Duration(milliseconds: 200), _scrollToBottom);
   }
 
   @override
@@ -62,133 +58,159 @@ class _TripChatScreenState extends State<TripChatScreen> {
         leading: const BackButton(color: Color(0xFF1B4E6B)),
         title: Column(
           children: [
-            Text(
-              'Trip Group Chat',
-              style: TextStyle(color: darkNavy, fontWeight: FontWeight.bold, fontSize: 16),
-            ),
+            Text('Trip Group Chat',
+                style: TextStyle(
+                    color: darkNavy,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16)),
             Text(
               '${widget.trip.destination} • ${widget.trip.travelers} pax',
               style: const TextStyle(color: Colors.grey, fontSize: 11),
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.info_outline, color: darkNavy),
-            onPressed: () {},
-          )
-        ],
       ),
+
       body: Column(
         children: [
-          Expanded(child: _messages()),
+          Expanded(child: _messageStream()),
           _inputBar(),
         ],
       ),
     );
   }
 
-  // ================= MESSAGE LIST =================
-  Widget _messages() {
-    if (widget.trip.messages.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey.shade300),
-            const SizedBox(height: 12),
-            const Text('Start the conversation!', style: TextStyle(color: Colors.black38)),
-          ],
-        ),
-      );
-    }
+  // ================= REALTIME MESSAGE STREAM =================
+  Widget _messageStream() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("trips")
+          .doc(widget.trip.id)
+          .collection("messages")
+          .orderBy("timestamp", descending: false)
+          .snapshots(),
 
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      itemCount: widget.trip.messages.length,
-      itemBuilder: (context, index) {
-        final msg = widget.trip.messages[index];
-        final isMe = msg.sender == 'You';
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              if (!isMe)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8, bottom: 4),
-                  child: Text(
-                    msg.sender,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: darkNavy.withOpacity(0.7)),
-                  ),
-                ),
-              Row(
-                mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (isMe) _timeText(msg.time, isMe),
-                  const SizedBox(width: 8),
-                  Container(
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isMe ? primaryBlue : Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(20),
-                        topRight: const Radius.circular(20),
-                        bottomLeft: Radius.circular(isMe ? 20 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 20),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      msg.message,
-                      style: TextStyle(
-                        color: isMe ? Colors.white : darkNavy,
-                        fontSize: 15,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (!isMe) _timeText(msg.time, isMe),
-                ],
-              ),
-            ],
-          ),
+        final docs = snapshot.data!.docs;
+
+        if (docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.chat_bubble_outline,
+                    size: 48, color: Colors.grey.shade300),
+                const SizedBox(height: 12),
+                const Text('Start the conversation!',
+                    style: TextStyle(color: Colors.black38)),
+              ],
+            ),
+          );
+        }
+
+        Future.delayed(const Duration(milliseconds: 200), _scrollToBottom);
+
+        return ListView.builder(
+          controller: _scrollController,
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final isMe = data["senderUid"] ==
+                FirebaseAuth.instance.currentUser!.uid;
+
+            return _chatBubble(
+              sender: data["senderName"] ?? "Unknown",
+              text: data["text"] ?? "",
+              time: (data["timestamp"] as Timestamp?)?.toDate(),
+              isMe: isMe,
+            );
+          },
         );
       },
     );
   }
 
-  Widget _timeText(DateTime time, bool isMe) {
+  // ================= CHAT BUBBLE =================
+  Widget _chatBubble(
+      {required String sender,
+      required String text,
+      DateTime? time,
+      required bool isMe}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Text(
-        _formatTime(time),
-        style: const TextStyle(fontSize: 10, color: Colors.grey),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (!isMe)
+            Padding(
+              padding: const EdgeInsets.only(left: 8, bottom: 4),
+              child: Text(sender,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: darkNavy.withOpacity(0.7))),
+            ),
+
+          Row(
+            mainAxisAlignment:
+                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            children: [
+              if (isMe && time != null) _time(time),
+              const SizedBox(width: 6),
+
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.7),
+                decoration: BoxDecoration(
+                  color: isMe ? primaryBlue : Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(20),
+                    topRight: const Radius.circular(20),
+                    bottomLeft:
+                        Radius.circular(isMe ? 20 : 4),
+                    bottomRight:
+                        Radius.circular(isMe ? 4 : 20),
+                  ),
+                ),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                      color: isMe ? Colors.white : darkNavy,
+                      fontSize: 15),
+                ),
+              ),
+
+              const SizedBox(width: 6),
+              if (!isMe && time != null) _time(time),
+            ],
+          )
+        ],
       ),
     );
   }
 
-  // ================= INPUT BAR (STYLIZED) =================
+  Widget _time(DateTime t) {
+    final hour = t.hour % 12 == 0 ? 12 : t.hour % 12;
+    final minute = t.minute.toString().padLeft(2, '0');
+    final suffix = t.hour >= 12 ? "PM" : "AM";
+    return Text("$hour:$minute $suffix",
+        style: const TextStyle(fontSize: 10, color: Colors.grey));
+  }
+
+  // ================= INPUT =================
   Widget _inputBar() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -2)),
-        ],
-      ),
+      color: Colors.white,
       child: SafeArea(
         top: false,
         child: Row(
@@ -197,16 +219,13 @@ class _TripChatScreenState extends State<TripChatScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF6F7F9),
-                  borderRadius: BorderRadius.circular(25),
-                ),
+                    color: const Color(0xFFF6F7F9),
+                    borderRadius: BorderRadius.circular(25)),
                 child: TextField(
                   controller: _controller,
                   decoration: const InputDecoration(
-                    hintText: 'Type a message...',
-                    hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                    border: InputBorder.none,
-                  ),
+                      hintText: "Type a message...",
+                      border: InputBorder.none),
                 ),
               ),
             ),
@@ -219,23 +238,13 @@ class _TripChatScreenState extends State<TripChatScreen> {
                 decoration: BoxDecoration(
                   color: primaryBlue,
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: primaryBlue.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4)),
-                  ],
                 ),
-                child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                child: const Icon(Icons.send, color: Colors.white),
               ),
-            ),
+            )
           ],
         ),
       ),
     );
-  }
-
-  String _formatTime(DateTime t) {
-    final hour = t.hour % 12 == 0 ? 12 : t.hour % 12;
-    final minute = t.minute.toString().padLeft(2, '0');
-    final period = t.hour >= 12 ? 'PM' : 'AM';
-    return '$hour:$minute $period';
   }
 }

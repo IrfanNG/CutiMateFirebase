@@ -7,6 +7,9 @@ import 'create_trip_step1.dart';
 import 'trip_detail_screen.dart';
 import 'budget_overview_screen.dart';
 import '/services/trip_service.dart';
+import 'package:rxdart/rxdart.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -200,40 +203,70 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ================= UPCOMING TRIP =================
   Widget _upcomingTrip() {
+    final user = FirebaseAuth.instance.currentUser!;
+
+    final ownedTrips = FirebaseFirestore.instance
+        .collection('trips')
+        .where('ownerUid', isEqualTo: user.uid)
+        .snapshots();
+
+    final invitedTrips = FirebaseFirestore.instance
+        .collection('trips')
+        .where('members', arrayContains: user.email)
+        .snapshots();
+
     return StreamBuilder<List<Trip>>(
-      stream: TripService.loadUserTrips(),
+      stream: Rx.combineLatest2(
+        ownedTrips,
+        invitedTrips,
+        (QuerySnapshot a, QuerySnapshot b) {
+          final docs = [...a.docs, ...b.docs];
+
+          // remove duplicates
+          final unique = {
+            for (var d in docs) d.id: d,
+          }.values.toList();
+
+          return unique
+          .map((d) => Trip.fromJson(d.id, d.data() as Map<String, dynamic>))
+          .toList();
+        },
+      ),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
         final trips = snapshot.data ?? [];
-        if (trips.isEmpty) {
-          return _buildEmptyState();
-        }
+        if (trips.isEmpty) return _buildEmptyState();
 
         final today = DateTime.now();
-        final upcoming = trips.where((t) => t.endDate.isAfter(today) || _isSameDay(t.endDate, today)).toList();
-        final past = trips.where((t) => t.endDate.isBefore(today)).toList();
 
-        upcoming.sort((a, b) => a.startDate.compareTo(b.startDate));
-        past.sort((a, b) => b.startDate.compareTo(a.startDate));
+        final myTrips = trips.where((t) => t.ownerUid == user.uid).toList();
+        final sharedTrips = trips.where((t) => t.ownerUid != user.uid).toList();
+
+        myTrips.sort((a, b) => a.startDate.compareTo(b.startDate));
+        sharedTrips.sort((a, b) => a.startDate.compareTo(b.startDate));
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (upcoming.isNotEmpty) ...[
-                _sectionHeader('Upcoming Adventures'),
+
+              /// ================== MY TRIPS ==================
+              if (myTrips.isNotEmpty) ...[
+                _sectionHeader("My Trips"),
                 const SizedBox(height: 12),
-                ...upcoming.map((trip) => _tripCard(trip, isPast: false)).toList(),
+                ...myTrips.map((t) => _tripCard(t, isPast: t.endDate.isBefore(today))).toList(),
+                const SizedBox(height: 25),
               ],
-              if (past.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                _sectionHeader('Past Memories'),
+
+              /// ================== SHARED TRIPS ==================
+              if (sharedTrips.isNotEmpty) ...[
+                _sectionHeader("Shared Trips"),
                 const SizedBox(height: 12),
-                ...past.map((trip) => _tripCard(trip, isPast: true)).toList(),
+                ...sharedTrips.map((t) => _tripCard(t, isPast: t.endDate.isBefore(today))).toList(),
               ],
             ],
           ),
@@ -262,9 +295,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _tripCard(Trip trip, {bool isPast = false}) {
+    final user = FirebaseAuth.instance.currentUser!;
+    final bool isOwner = trip.ownerUid == user.uid;
+
     return GestureDetector(
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => TripDetailScreen(trip: trip)));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => TripDetailScreen(trip: trip)),
+        );
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
@@ -272,7 +311,11 @@ class _HomeScreenState extends State<HomeScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 5)),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
           ],
         ),
         child: IntrinsicHeight(
@@ -283,42 +326,83 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 6,
                 decoration: BoxDecoration(
                   color: isPast ? Colors.grey : primaryBlue,
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), bottomLeft: Radius.circular(24)),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    bottomLeft: Radius.circular(24),
+                  ),
                 ),
               ),
+
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      
+                      /// ===== TITLE + ROLE BADGE =====
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             trip.destination,
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: darkNavy),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: darkNavy,
+                            ),
                           ),
-                          Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey.shade400),
+
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isOwner
+                                  ? Colors.green.withOpacity(0.15)
+                                  : Colors.blue.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              isOwner ? "OWNER" : "JOINED",
+                                style: TextStyle(
+                                color: isOwner ? Colors.green.shade700 : Colors.blue.shade700,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
+
                       const SizedBox(height: 6),
+
+                      /// ===== DATES =====
                       Row(
                         children: [
-                          Icon(Icons.calendar_today_rounded, size: 14, color: primaryBlue),
+                          Icon(Icons.calendar_today_rounded,
+                              size: 14, color: primaryBlue),
                           const SizedBox(width: 6),
                           Text(
                             '${trip.startDate.day}/${trip.startDate.month} - ${trip.endDate.day}/${trip.endDate.month}',
-                            style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 12),
+
+                      /// ===== BADGES =====
                       Row(
                         children: [
-                          _badge(Icons.people_outline_rounded, '${trip.travelers} Pax'),
+                          _badge(Icons.people_outline_rounded,
+                              '${trip.travelers} Pax'),
                           const SizedBox(width: 12),
-                          _badge(Icons.payments_outlined, 'RM ${trip.budget.toStringAsFixed(0)}'),
+                          _badge(Icons.payments_outlined,
+                              'RM ${trip.budget.toStringAsFixed(0)}'),
                         ],
                       ),
                     ],
