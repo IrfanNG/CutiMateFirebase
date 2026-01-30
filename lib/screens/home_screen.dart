@@ -119,20 +119,33 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1. Hero Header + Overlapping Plan Card
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              _buildHeroSection(),
-              Positioned(
-                bottom: -60, // Overlap amount
-                left: 20,
-                right: 20,
-                child: _buildPlanJourneyCard(),
-              ),
-            ],
+          // Fixed height stack to ensure the overlapping card is fully hit-testable
+          SizedBox(
+            height: 380, // 320 (Hero) + 60 (Overhang)
+            child: Stack(
+              children: [
+                // Background Section
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 320,
+                  child: _buildHeroSection(),
+                ),
+                // Card
+                Positioned(
+                  bottom: 0, // Aligns to bottom of 380px, so 60px below image
+                  left: 20,
+                  right: 20,
+                  child: _buildPlanJourneyCard(),
+                ),
+              ],
+            ),
           ),
 
-          const SizedBox(height: 80), // Space for the overlapping card
+          const SizedBox(
+            height: 20,
+          ), // Reduced spacing since stack now includes the 60px overhang
           // 2. Upcoming Trips
           _upcomingTrip(),
 
