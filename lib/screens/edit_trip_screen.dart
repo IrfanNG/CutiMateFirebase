@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/trip_model.dart';
 
+/// ===============================================================
+/// EDIT TRIP SCREEN (REDESIGNED)
+/// ---------------------------------------------------------------
+/// This screen allows the user to edit an existing trip.
+/// Updated to match the Coral Orange modern theme.
+/// ===============================================================
 class EditTripScreen extends StatefulWidget {
   final Trip trip;
 
@@ -14,11 +20,12 @@ class EditTripScreen extends StatefulWidget {
 class _EditTripScreenState extends State<EditTripScreen> {
   final formKey = GlobalKey<FormState>();
 
-  // Theme Colors - Same as Detail Screen
-  final Color primaryBlue = const Color(0xFF1BA0E2);
-  final Color darkNavy = const Color(0xFF1B4E6B);
-  final Color bgGray = const Color(0xFFF6F7F9);
+  // Theme Colors
+  final Color primaryCoral = const Color(0xFFFF7F50);
+  final Color bgLight = const Color(0xFFF6F7F9);
+  final Color darkNavy = const Color(0xFF111827);
 
+  // Controllers
   late TextEditingController title;
   late TextEditingController destination;
   late TextEditingController travelers;
@@ -26,6 +33,7 @@ class _EditTripScreenState extends State<EditTripScreen> {
   late TextEditingController accommodation;
   late TextEditingController budget;
 
+  // Usage Variables
   late DateTime startDate;
   late DateTime endDate;
 
@@ -42,6 +50,7 @@ class _EditTripScreenState extends State<EditTripScreen> {
     endDate = widget.trip.endDate;
   }
 
+  // UPDATE LOGIC
   Future<void> updateTrip() async {
     if (!formKey.currentState!.validate()) return;
 
@@ -56,8 +65,16 @@ class _EditTripScreenState extends State<EditTripScreen> {
       endDate: endDate,
     );
 
-    // Show loading overlay
-    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF7F50)),
+        ),
+      ),
+    );
 
     await FirebaseFirestore.instance
         .collection("trips")
@@ -65,11 +82,12 @@ class _EditTripScreenState extends State<EditTripScreen> {
         .update(updatedTrip.toJson());
 
     if (mounted) {
-      Navigator.pop(context); // Pop loading
-      Navigator.pop(context, updatedTrip); // Return to detail
+      Navigator.pop(context); // Close loading
+      Navigator.pop(context, updatedTrip); // Return updated trip
     }
   }
 
+  // DATE PICKER
   Future<void> pickDate(bool isStart) async {
     final picked = await showDatePicker(
       context: context,
@@ -79,7 +97,11 @@ class _EditTripScreenState extends State<EditTripScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(primary: primaryBlue, onPrimary: Colors.white, onSurface: darkNavy),
+            colorScheme: ColorScheme.light(
+              primary: primaryCoral, // Coral Calendar Head
+              onPrimary: Colors.white,
+              onSurface: darkNavy,
+            ),
           ),
           child: child!,
         );
@@ -88,98 +110,239 @@ class _EditTripScreenState extends State<EditTripScreen> {
 
     if (picked != null) {
       setState(() {
-        if (isStart) startDate = picked;
-        else endDate = picked;
+        if (isStart) {
+          startDate = picked;
+        } else {
+          endDate = picked;
+        }
       });
     }
   }
 
+  // ================= MAIN BUILD =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgGray,
-      appBar: AppBar(
-        title: const Text("Edit Trip Details", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)),
-        backgroundColor: primaryBlue,
-        elevation: 0,
-        leading: const BackButton(color: Colors.white),
-      ),
-      body: Form(
-        key: formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            _sectionLabel("GENERAL INFORMATION"),
-            _buildTextField(title, "Trip Title", Icons.edit_note_rounded),
-            _buildTextField(destination, "Destination", Icons.place_rounded),
-            
-            const SizedBox(height: 24),
-            _sectionLabel("DATE & DURATION"),
-            Row(
-              children: [
-                Expanded(child: _dateTile("Start Date", startDate, () => pickDate(true))),
-                const SizedBox(width: 12),
-                Expanded(child: _dateTile("End Date", endDate, () => pickDate(false))),
-              ],
-            ),
+      backgroundColor: bgLight,
+      body: Column(
+        children: [
+          // 1. Custom Header
+          _buildCustomHeader(),
 
-            const SizedBox(height: 24),
-            _sectionLabel("PLANNING DETAILS"),
-            Row(
-              children: [
-                Expanded(child: _buildTextField(travelers, "Travelers", Icons.people_outline, isNum: true)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildTextField(budget, "Budget (RM)", Icons.payments_outlined, isNum: true)),
-              ],
-            ),
-            _buildTextField(transport, "Transport Mode", Icons.local_taxi_rounded),
-            _buildTextField(accommodation, "Accommodation", Icons.hotel_rounded),
+          // 2. Form Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // GENERAL
+                    _sectionLabel("GENERAL INFORMATION"),
+                    _buildTextField(
+                      title,
+                      "Trip Title",
+                      Icons.edit_note_rounded,
+                    ),
+                    _buildTextField(
+                      destination,
+                      "Destination",
+                      Icons.place_rounded,
+                    ),
+                    const SizedBox(height: 24),
 
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: updateTrip,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: darkNavy,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 4,
-                shadowColor: darkNavy.withOpacity(0.4),
+                    // DATES
+                    _sectionLabel("DATE & DURATION"),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _dateTile(
+                            "Start Date",
+                            startDate,
+                            () => pickDate(true),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _dateTile(
+                            "End Date",
+                            endDate,
+                            () => pickDate(false),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // PLANNING
+                    _sectionLabel("PLANNING DETAILS"),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            travelers,
+                            "Travelers",
+                            Icons.people_outline,
+                            isNum: true,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildTextField(
+                            budget,
+                            "Budget (RM)",
+                            Icons.payments_outlined,
+                            isNum: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    _buildTextField(
+                      transport,
+                      "Transport Mode",
+                      Icons.local_taxi_rounded,
+                    ),
+                    _buildTextField(
+                      accommodation,
+                      "Accommodation",
+                      Icons.hotel_rounded,
+                    ),
+                    const SizedBox(height: 40),
+
+                    // SAVE BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: updateTrip,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryCoral,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          elevation: 8,
+                          shadowColor: primaryCoral.withOpacity(0.4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          "SAVE CHANGES",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
-              child: const Text("SAVE CHANGES", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
             ),
-            const SizedBox(height: 20),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= CUSTOM HEADER =================
+  Widget _buildCustomHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.grey.shade200),
+                color: Colors.white,
+              ),
+              child: const Icon(
+                Icons.arrow_back,
+                size: 20,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          Text(
+            'Edit Trip',
+            style: TextStyle(
+              fontFamily: 'Serif',
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: darkNavy,
+            ),
+          ),
+          const SizedBox(width: 44), // Spacer for centering
+        ],
+      ),
+    );
+  }
+
+  // ================= WIDGETS =================
+  Widget _sectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 12),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade500,
+          letterSpacing: 1.1,
         ),
       ),
     );
   }
 
-  Widget _sectionLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 12),
-      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600, letterSpacing: 1.1)),
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isNum = false}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool isNum = false,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: TextFormField(
         controller: controller,
         keyboardType: isNum ? TextInputType.number : TextInputType.text,
-        style: const TextStyle(fontWeight: FontWeight.w600),
+        style: TextStyle(fontWeight: FontWeight.w600, color: darkNavy),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-          prefixIcon: Icon(icon, color: primaryBlue, size: 22),
+          labelStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+          prefixIcon: Icon(icon, color: primaryCoral, size: 22), // Coral icons
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
         validator: (v) => v!.isEmpty ? "Required" : null,
       ),
@@ -194,18 +357,42 @@ class _EditTripScreenState extends State<EditTripScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade400,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 6),
             Row(
               children: [
-                Icon(Icons.calendar_month_rounded, size: 16, color: primaryBlue),
+                Icon(
+                  Icons.calendar_month_rounded,
+                  size: 16,
+                  color: primaryCoral,
+                ),
                 const SizedBox(width: 8),
-                Text("${date.day}/${date.month}/${date.year}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(
+                  "${date.day}/${date.month}/${date.year}",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: darkNavy,
+                  ),
+                ),
               ],
             ),
           ],

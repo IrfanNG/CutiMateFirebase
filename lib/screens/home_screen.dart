@@ -5,12 +5,20 @@ import 'groups_screen.dart';
 import 'profile_screen.dart';
 import 'create_trip_step1.dart';
 import 'trip_detail_screen.dart';
-import 'budget_overview_screen.dart';
-import '/services/trip_service.dart';
-import 'package:rxdart/rxdart.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+/// ===============================================================
+/// HOME SCREEN
+/// ---------------------------------------------------------------
+/// Main landing screen of the app.
+/// Handles:
+/// - Bottom navigation
+/// - Home dashboard
+/// - Upcoming trips
+/// - Navigation to other main features
+/// ===============================================================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -19,13 +27,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  /// Current index for BottomNavigationBar
   int _currentIndex = 0;
 
-  // CutiMate Theme Colors
-  final Color primaryBlue = const Color(0xFF1BA0E2);
-  final Color darkNavy = const Color(0xFF1B4E6B);
+  /// CutiMate theme colors
   final Color bgLight = const Color(0xFFF6F7F9);
 
+  /// ===============================================================
+  /// Returns the page based on selected bottom navigation index
+  /// ===============================================================
   Widget _getPage() {
     switch (_currentIndex) {
       case 0:
@@ -37,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         return ProfileScreen(
           onBack: () {
+            // Return to Home tab when exiting profile
             setState(() => _currentIndex = 0);
           },
         );
@@ -45,11 +56,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// ===============================================================
+  /// MAIN UI BUILD
+  /// ===============================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgLight,
+
+      /// Display selected page
       body: _getPage(),
+
+      /// Bottom navigation bar
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -60,91 +78,282 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex: _currentIndex,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
-          selectedItemColor: primaryBlue,
-          unselectedItemColor: Colors.grey.shade400,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          selectedItemColor: const Color(
+            0xFFFF7F50,
+          ), // Coral Orange for selected
+          unselectedItemColor: Colors
+              .grey
+              .shade500, // Slightly darker grey for better visibility
+          /// Change tab when tapped
           onTap: (i) => setState(() => _currentIndex = i),
+
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.explore_rounded), label: 'Explore'),
-            BottomNavigationBarItem(icon: Icon(Icons.group_rounded), label: 'Groups'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.explore_rounded),
+              label: 'Explore',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.group_rounded),
+              label: 'Groups',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_rounded),
+              label: 'Profile',
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ================= HOME =================
+  // ===============================================================
+  // HOME DASHBOARD CONTENT
+  // ===============================================================
   Widget _home() {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _header(),
-          const SizedBox(height: 24),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Quick Actions',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B4E6B)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _services(),
-          const SizedBox(height: 32),
-          _upcomingTrip(),
-          const SizedBox(height: 32),
-        ],
-      ),
-    );
-  }
-
-  // ================= HEADER =================
-  Widget _header() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 64, 24, 32),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [primaryBlue, primaryBlue.withBlue(230)],
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // 1. Hero Header + Overlapping Plan Card
+          Stack(
+            clipBehavior: Clip.none,
             children: [
-              const Text(
-                'CutiMate',
-                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, letterSpacing: 1),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Where to next?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
+              _buildHeroSection(),
+              Positioned(
+                bottom: -60, // Overlap amount
+                left: 20,
+                right: 20,
+                child: _buildPlanJourneyCard(),
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () => setState(() => _currentIndex = 3),
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-              child: CircleAvatar(
-                radius: 24,
-                backgroundColor: bgLight,
-                child: Icon(Icons.person_rounded, color: primaryBlue, size: 30),
+
+          const SizedBox(height: 80), // Space for the overlapping card
+          // 2. Upcoming Trips
+          _upcomingTrip(),
+
+          const SizedBox(height: 10),
+
+          // 3. Shared Trips (Replaced Saved Destinations)
+          _buildSharedTrips(),
+
+          const SizedBox(height: 100), // Bottom padding
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // HERO SECTION
+  // Background Image + Greeting + Profile Icon
+  // ===============================================================
+  Widget _buildHeroSection() {
+    final user = FirebaseAuth.instance.currentUser;
+
+    return Container(
+      height: 320, // Tall header for background image
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: NetworkImage(
+            'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=2070&auto=format&fit=crop', // Scenic mountain/lake background
+          ),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withOpacity(0.3),
+              Colors.black.withOpacity(0.1),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 60, 24, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Greeting Text with FutureBuilder for Name
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Good Morning,',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                          shadows: [
+                            Shadow(
+                              offset: Offset(0, 1),
+                              blurRadius: 4,
+                              color: Colors.black45,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Fetch user name
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(user?.uid)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          String name = "Traveler";
+                          if (snapshot.hasData &&
+                              snapshot.data != null &&
+                              snapshot.data!.exists) {
+                            final data =
+                                snapshot.data!.data() as Map<String, dynamic>?;
+                            if (data != null && data.containsKey('name')) {
+                              name = data['name'];
+                              // Get first name only if it's long?
+                              // name = name.split(' ').first;
+                            }
+                          } else if (user?.displayName != null) {
+                            name = user!.displayName!;
+                          }
+
+                          return Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              height: 1.0,
+                              shadows: [
+                                Shadow(
+                                  offset: Offset(0, 1),
+                                  blurRadius: 4,
+                                  color: Colors.black45,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // Profile Avatar
+                  GestureDetector(
+                    onTap: () => setState(() => _currentIndex = 3),
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const CircleAvatar(
+                        radius: 22,
+                        backgroundImage: NetworkImage(
+                          'https://i.pravatar.cc/150?img=12',
+                        ), // Mock profile
+                        backgroundColor: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // PLAN JOURNEY CARD (CTA)
+  // Overlaps the hero section
+  // ===============================================================
+  Widget _buildPlanJourneyCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.95), // Glassmorphism-ish
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+            spreadRadius: -5,
+          ),
+        ],
+        border: Border.all(color: Colors.white.withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'READY FOR ADVENTURE?',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade500,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Plan your next journey',
+            style: TextStyle(
+              fontSize: 20, // Increased size
+              fontWeight: FontWeight
+                  .bold, // Serif-style font would be nice here if available
+              color: Color(0xFF1F2937),
+              letterSpacing: -0.5,
+              fontFamily: 'serif', // Trying generic serif for elegance
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Create New Trip Button
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CreateTripStep1()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(
+                  0xFFFF7F50,
+                ), // Coral color from mockup
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.add_circle_outline_rounded, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Create New Trip',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ],
               ),
             ),
           ),
@@ -153,55 +362,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ================= QUICK ACTIONS =================
-  Widget _services() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _service(Icons.add_location_alt_rounded, 'New Trip', () async {
-            await Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateTripStep1()));
-          }),
-          _service(Icons.map_rounded, 'Explore', () {
-            setState(() => _currentIndex = 1);
-          }),
-          _service(Icons.people_alt_rounded, 'Groups', () {
-            setState(() => _currentIndex = 2);
-          }),
-          _service(Icons.account_balance_wallet_rounded, 'Budget', () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => BudgetOverviewScreen()));
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _service(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            height: 65,
-            width: 65,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(color: primaryBlue.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4)),
-              ],
-            ),
-            child: Icon(icon, color: primaryBlue, size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: darkNavy)),
-        ],
-      ),
-    );
-  }
-
-  // ================= UPCOMING TRIP =================
+  // ===============================================================
+  // UPCOMING TRIPS SECTION (Allocated for "My Trips")
+  // Loads owned trips using Firebase streams
+  // Horizontal ListView
+  // ===============================================================
   Widget _upcomingTrip() {
     final user = FirebaseAuth.instance.currentUser!;
 
@@ -210,64 +375,155 @@ class _HomeScreenState extends State<HomeScreen> {
         .where('ownerUid', isEqualTo: user.uid)
         .snapshots();
 
-    final invitedTrips = FirebaseFirestore.instance
-        .collection('trips')
-        .where('members', arrayContains: user.email)
-        .snapshots();
-
-    return StreamBuilder<List<Trip>>(
-      stream: Rx.combineLatest2(
-        ownedTrips,
-        invitedTrips,
-        (QuerySnapshot a, QuerySnapshot b) {
-          final docs = [...a.docs, ...b.docs];
-
-          // remove duplicates
-          final unique = {
-            for (var d in docs) d.id: d,
-          }.values.toList();
-
-          return unique
-          .map((d) => Trip.fromJson(d.id, d.data() as Map<String, dynamic>))
-          .toList();
-        },
-      ),
+    return StreamBuilder<QuerySnapshot>(
+      stream: ownedTrips,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final trips = snapshot.data ?? [];
-        if (trips.isEmpty) return _buildEmptyState();
+        final docs = snapshot.data!.docs;
+        final trips = docs
+            .map((d) => Trip.fromJson(d.id, d.data() as Map<String, dynamic>))
+            .toList();
 
-        final today = DateTime.now();
+        // Sort by start date
+        trips.sort((a, b) => a.startDate.compareTo(b.startDate));
 
-        final myTrips = trips.where((t) => t.ownerUid == user.uid).toList();
-        final sharedTrips = trips.where((t) => t.ownerUid != user.uid).toList();
+        return Column(
+          children: [
+            // Section Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Upcoming Trips",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  Text(
+                    "View all",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFFFF7F50),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-        myTrips.sort((a, b) => a.startDate.compareTo(b.startDate));
-        sharedTrips.sort((a, b) => a.startDate.compareTo(b.startDate));
+            const SizedBox(height: 16),
+
+            if (trips.isEmpty)
+              _buildEmptyNotification("You have no upcoming trips.")
+            else
+              SizedBox(
+                height: 240,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: trips.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) {
+                    return _tripCard(trips[index]);
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ===============================================================
+  // SHARED TRIPS SECTION
+  // Replaces "Saved Destinations"
+  // Loads trips where user is a member (invited)
+  // Grid Layout
+  // ===============================================================
+  Widget _buildSharedTrips() {
+    final user = FirebaseAuth.instance.currentUser!;
+
+    final invitedTrips = FirebaseFirestore.instance
+        .collection('trips')
+        .where('members', arrayContains: user.email)
+        .snapshots();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: invitedTrips,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          // Loading state for shared section
+          return const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final docs = snapshot.data!.docs;
+        final tripsData = docs
+            .map((d) => Trip.fromJson(d.id, d.data() as Map<String, dynamic>))
+            .toList();
+
+        // Filter OUT trips where I am the owner
+        // because "members" array usually includes the owner too if they auto-added themselves
+        // or just to be safe so we don't duplicate.
+        final trips = tripsData.where((t) => t.ownerUid != user.uid).toList();
+
+        // Sort by start date
+        trips.sort((a, b) => a.startDate.compareTo(b.startDate));
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Shared Trips",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  Text(
+                    "View all",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFFFF7F50),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
 
-              /// ================== MY TRIPS ==================
-              if (myTrips.isNotEmpty) ...[
-                _sectionHeader("My Trips"),
-                const SizedBox(height: 12),
-                ...myTrips.map((t) => _tripCard(t, isPast: t.endDate.isBefore(today))).toList(),
-                const SizedBox(height: 25),
-              ],
-
-              /// ================== SHARED TRIPS ==================
-              if (sharedTrips.isNotEmpty) ...[
-                _sectionHeader("Shared Trips"),
-                const SizedBox(height: 12),
-                ...sharedTrips.map((t) => _tripCard(t, isPast: t.endDate.isBefore(today))).toList(),
-              ],
+              if (trips.isEmpty)
+                _buildEmptyNotification("No shared trips yet.")
+              else
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: trips.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.75, // Taller for grid cards
+                  ),
+                  itemBuilder: (context, index) {
+                    return _sharedTripGridCard(trips[index]);
+                  },
+                ),
             ],
           ),
         );
@@ -275,28 +531,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _sectionHeader(String title) {
-    return Text(
-      title,
-      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: darkNavy),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        children: [
-          Icon(Icons.beach_access_rounded, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text('No trips planned yet', style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
-        ],
+  // ===============================================================
+  // HELPER: Empty State Text
+  // ===============================================================
+  Widget _buildEmptyNotification(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Center(
+        child: Text(
+          message,
+          style: TextStyle(
+            color: Colors.grey.shade400,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _tripCard(Trip trip, {bool isPast = false}) {
-    final user = FirebaseAuth.instance.currentUser!;
-    final bool isOwner = trip.ownerUid == user.uid;
+  // ===============================================================
+  // TRIP CARD (Horizontal List Item)
+  // For "Upcoming Trips"
+  // ===============================================================
+  Widget _tripCard(Trip trip) {
+    final daysLeft = trip.startDate.difference(DateTime.now()).inDays;
+    String badgeText = daysLeft > 0
+        ? "$daysLeft DAYS LEFT"
+        : (daysLeft == 0 ? "TODAY" : "ONGOING");
+    if (daysLeft < 0 && trip.endDate.isBefore(DateTime.now()))
+      badgeText = "COMPLETED";
+
+    String imageUrl = _getImageForDestination(trip.destination);
 
     return GestureDetector(
       onTap: () {
@@ -306,134 +578,244 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        width: 300,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: IntrinsicHeight(
-          child: Row(
-            children: [
-              // Blue accent bar
-              Container(
-                width: 6,
-                decoration: BoxDecoration(
-                  color: isPast ? Colors.grey : primaryBlue,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    bottomLeft: Radius.circular(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Area
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                  child: Image.network(
+                    imageUrl,
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: Colors.grey.shade300, height: 160),
                   ),
                 ),
-              ),
-
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                if (daysLeft >= 0)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            // Info Area
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    trip.destination,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
                     children: [
-                      
-                      /// ===== TITLE + ROLE BADGE =====
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            trip.destination,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: darkNavy,
-                            ),
-                          ),
-
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isOwner
-                                  ? Colors.green.withOpacity(0.15)
-                                  : Colors.blue.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              isOwner ? "OWNER" : "JOINED",
-                                style: TextStyle(
-                                color: isOwner ? Colors.green.shade700 : Colors.blue.shade700,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 10,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        Icons.calendar_today_rounded,
+                        size: 12,
+                        color: Colors.grey.shade400,
                       ),
-
-                      const SizedBox(height: 6),
-
-                      /// ===== DATES =====
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_today_rounded,
-                              size: 14, color: primaryBlue),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${trip.startDate.day}/${trip.startDate.month} - ${trip.endDate.day}/${trip.endDate.month}',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      /// ===== BADGES =====
-                      Row(
-                        children: [
-                          _badge(Icons.people_outline_rounded,
-                              '${trip.travelers} Pax'),
-                          const SizedBox(width: 12),
-                          _badge(Icons.payments_outlined,
-                              'RM ${trip.budget.toStringAsFixed(0)}'),
-                        ],
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_formatDate(trip.startDate)} - ${_formatDate(trip.endDate)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _badge(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bgLight,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: darkNavy),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: darkNavy, fontWeight: FontWeight.w600)),
-        ],
+  // ===============================================================
+  // SHARED TRIP GRID CARD
+  // For "Shared Trips"
+  // ===============================================================
+  Widget _sharedTripGridCard(Trip trip) {
+    String imageUrl = _getImageForDestination(trip.destination);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => TripDetailScreen(trip: trip)),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
+                    child: Image.network(
+                      imageUrl,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Container(color: Colors.grey.shade200),
+                    ),
+                  ),
+                  // Shared Badge
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.group_rounded,
+                        size: 14,
+                        color: Colors.teal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    trip.destination,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Color(0xFF1F2937),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people_outline,
+                        size: 12,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "${trip.travelers} Members",
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
+  // Helper to get consistent placeholder images
+  String _getImageForDestination(String destination) {
+    String lower = destination.toLowerCase();
+    if (lower.contains('bali'))
+      return 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1000';
+    if (lower.contains('kyoto'))
+      return 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1000';
+    if (lower.contains('paris'))
+      return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1000';
+    if (lower.contains('tokyo'))
+      return 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1000';
+    if (lower.contains('new york'))
+      return 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1000';
+    if (lower.contains('london'))
+      return 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=1000';
+
+    // Default random-ish based on length to be deterministic per load
+    return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000';
+  }
+
+  String _formatDate(DateTime date) {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return "${months[date.month - 1]} ${date.day}";
   }
 }

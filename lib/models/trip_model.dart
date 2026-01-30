@@ -25,6 +25,10 @@ class Trip {
 
   final List<ChatMessage> messages;
 
+  // Cost Allocation
+  final Map<String, String>
+  categoryAssignments; // Key: Category, Value: MemberName or "SPLIT"
+
   Trip({
     this.id = '',
     required this.ownerUid,
@@ -45,54 +49,58 @@ class Trip {
     required this.tasks,
     List<ChecklistItem>? checklist,
     List<ChatMessage>? messages,
-  })  : checklist = checklist ?? [],
-        messages = messages ?? [];
+    Map<String, String>? categoryAssignments,
+  }) : checklist = checklist ?? [],
+       messages = messages ?? [],
+       categoryAssignments = categoryAssignments ?? {};
 
   int get days => endDate.difference(startDate).inDays + 1;
-  
+
   Trip copyWith({
-  String? id,
-  String? ownerUid,
-  String? title,
-  String? destination,
-  DateTime? startDate,
-  DateTime? endDate,
-  int? travelers,
-  String? transport,
-  String? accommodation,
-  double? budget,
-  List<String>? activities,
-  List<ItineraryItem>? itinerary,
-  List<ExpenseItem>? expenses,
-  List<TaskItem>? tasks,
-  List<ChecklistItem>? checklist,
-  String? groupName,
-  List<String>? members,
-  bool? isGroup,
-  List<ChatMessage>? messages,
-}) {
-  return Trip(
-    id: id ?? this.id,
-    ownerUid: ownerUid ?? this.ownerUid,
-    title: title ?? this.title,
-    destination: destination ?? this.destination,
-    startDate: startDate ?? this.startDate,
-    endDate: endDate ?? this.endDate,
-    travelers: travelers ?? this.travelers,
-    transport: transport ?? this.transport,
-    accommodation: accommodation ?? this.accommodation,
-    budget: budget ?? this.budget,
-    activities: activities ?? this.activities,
-    itinerary: itinerary ?? this.itinerary,
-    expenses: expenses ?? this.expenses,
-    tasks: tasks ?? this.tasks,
-    checklist: checklist ?? this.checklist,
-    groupName: groupName ?? this.groupName,
-    members: members ?? this.members,
-    isGroup: isGroup ?? this.isGroup,
-    messages: messages ?? this.messages,
-  );
-}
+    String? id,
+    String? ownerUid,
+    String? title,
+    String? destination,
+    DateTime? startDate,
+    DateTime? endDate,
+    int? travelers,
+    String? transport,
+    String? accommodation,
+    double? budget,
+    List<String>? activities,
+    List<ItineraryItem>? itinerary,
+    List<ExpenseItem>? expenses,
+    List<TaskItem>? tasks,
+    List<ChecklistItem>? checklist,
+    String? groupName,
+    List<String>? members,
+    bool? isGroup,
+    List<ChatMessage>? messages,
+    Map<String, String>? categoryAssignments,
+  }) {
+    return Trip(
+      id: id ?? this.id,
+      ownerUid: ownerUid ?? this.ownerUid,
+      title: title ?? this.title,
+      destination: destination ?? this.destination,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      travelers: travelers ?? this.travelers,
+      transport: transport ?? this.transport,
+      accommodation: accommodation ?? this.accommodation,
+      budget: budget ?? this.budget,
+      activities: activities ?? this.activities,
+      itinerary: itinerary ?? this.itinerary,
+      expenses: expenses ?? this.expenses,
+      tasks: tasks ?? this.tasks,
+      checklist: checklist ?? this.checklist,
+      groupName: groupName ?? this.groupName,
+      members: members ?? this.members,
+      isGroup: isGroup ?? this.isGroup,
+      messages: messages ?? this.messages,
+      categoryAssignments: categoryAssignments ?? this.categoryAssignments,
+    );
+  }
 
   // ---------------- SAVE TO FIRESTORE ----------------
   Map<String, dynamic> toJson() {
@@ -117,6 +125,7 @@ class Trip {
       'groupName': groupName,
       'members': members,
       'isGroup': isGroup,
+      'categoryAssignments': categoryAssignments,
     };
   }
 
@@ -165,6 +174,9 @@ class Trip {
       isGroup: json['isGroup'] ?? false,
       groupName: json['groupName'] ?? '',
       members: List<String>.from(json['members'] ?? []),
+      categoryAssignments: Map<String, String>.from(
+        json['categoryAssignments'] ?? {},
+      ),
     );
   }
 }
@@ -182,18 +194,18 @@ class ChatMessage {
   });
 
   Map<String, dynamic> toMap() => {
-        'sender': sender,
-        'message': message,
-        'time': Timestamp.fromDate(time),
-      };
+    'sender': sender,
+    'message': message,
+    'time': Timestamp.fromDate(time),
+  };
 
   static ChatMessage fromMap(Map<String, dynamic> map) => ChatMessage(
-        sender: map['sender'],
-        message: map['message'],
-        time: (map['time'] is Timestamp)
-            ? (map['time'] as Timestamp).toDate()
-            : DateTime.fromMillisecondsSinceEpoch(map['time']),
-      );
+    sender: map['sender'],
+    message: map['message'],
+    time: (map['time'] is Timestamp)
+        ? (map['time'] as Timestamp).toDate()
+        : DateTime.fromMillisecondsSinceEpoch(map['time']),
+  );
 }
 
 // ================= CHECKLIST =================
@@ -201,20 +213,12 @@ class ChecklistItem {
   String title;
   bool isChecked;
 
-  ChecklistItem({
-    required this.title,
-    this.isChecked = false,
-  });
+  ChecklistItem({required this.title, this.isChecked = false});
 
-  Map<String, dynamic> toMap() => {
-        'title': title,
-        'isChecked': isChecked,
-      };
+  Map<String, dynamic> toMap() => {'title': title, 'isChecked': isChecked};
 
-  static ChecklistItem fromMap(Map<String, dynamic> map) => ChecklistItem(
-        title: map['title'],
-        isChecked: map['isChecked'] ?? false,
-      );
+  static ChecklistItem fromMap(Map<String, dynamic> map) =>
+      ChecklistItem(title: map['title'], isChecked: map['isChecked'] ?? false);
 }
 
 // ================= ITINERARY =================
@@ -222,45 +226,58 @@ class ItineraryItem {
   final String title;
   final String time;
   final String note;
+  final double? lat;
+  final double? lng;
 
   ItineraryItem({
     required this.title,
     required this.time,
     required this.note,
+    this.lat,
+    this.lng,
   });
 
   Map<String, dynamic> toMap() => {
-        'title': title,
-        'time': time,
-        'note': note,
-      };
+    'title': title,
+    'time': time,
+    'note': note,
+    'lat': lat,
+    'lng': lng,
+  };
 
   static ItineraryItem fromMap(Map<String, dynamic> map) => ItineraryItem(
-        title: map['title'],
-        time: map['time'],
-        note: map['note'],
-      );
+    title: map['title'],
+    time: map['time'],
+    note: map['note'],
+    lat: map['lat'],
+    lng: map['lng'],
+  );
 }
 
+// ================= EXPENSE =================
 // ================= EXPENSE =================
 class ExpenseItem {
   final String title;
   final double amount;
+  final String category; // New field
 
   ExpenseItem({
     required this.title,
     required this.amount,
+    this.category = 'Other',
   });
 
   Map<String, dynamic> toMap() => {
-        'title': title,
-        'amount': amount,
-      };
+    'title': title,
+    'amount': amount,
+    'category': category,
+  };
 
   static ExpenseItem fromMap(Map<String, dynamic> map) => ExpenseItem(
-        title: map['title'],
-        amount: (map['amount'] as num).toDouble(),
-      );
+    title: map['title'],
+    amount: (map['amount'] as num).toDouble(),
+    category: map['category'] ?? 'Other',
+  );
 }
 
 // ================= TASK =================
@@ -268,18 +285,10 @@ class TaskItem {
   final String title;
   bool completed;
 
-  TaskItem({
-    required this.title,
-    this.completed = false,
-  });
+  TaskItem({required this.title, this.completed = false});
 
-  Map<String, dynamic> toMap() => {
-        'title': title,
-        'completed': completed,
-      };
+  Map<String, dynamic> toMap() => {'title': title, 'completed': completed};
 
-  static TaskItem fromMap(Map<String, dynamic> map) => TaskItem(
-        title: map['title'],
-        completed: map['completed'] ?? false,
-      );
+  static TaskItem fromMap(Map<String, dynamic> map) =>
+      TaskItem(title: map['title'], completed: map['completed'] ?? false);
 }

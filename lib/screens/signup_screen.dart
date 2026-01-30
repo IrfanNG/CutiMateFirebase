@@ -26,11 +26,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
     try {
       setState(() => _loading = true);
 
-      final userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
 
       final uid = userCredential.user!.uid;
 
@@ -71,7 +71,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1B4E6B)),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFFFF7F50),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -82,10 +85,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              const Color(0xFF1BA0E2).withOpacity(0.1),
-              Colors.white,
-            ],
+            colors: [const Color(0xFFFF7F50).withOpacity(0.1), Colors.white],
           ),
         ),
         child: SafeArea(
@@ -100,17 +100,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF1B4E6B),
+                    color: Color(0xFFFF7F50),
                     letterSpacing: 1.1,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Start planning your next adventure today.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 40),
 
@@ -137,7 +134,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   icon: Icons.lock_outline_rounded,
                   isPassword: true,
                 ),
-                
+
                 const SizedBox(height: 40),
 
                 // Sign Up Button
@@ -147,9 +144,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: ElevatedButton(
                     onPressed: _loading ? null : _signUp,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1BA0E2),
+                      backgroundColor: const Color(0xFFFF7F50),
                       foregroundColor: Colors.white,
-                      elevation: 0,
+                      elevation: 5,
+                      shadowColor: const Color(0xFFFF7F50).withOpacity(0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -166,19 +164,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 Center(
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: RichText(
-                      text: const TextSpan(
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                      text: TextSpan(
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
                         children: [
-                          TextSpan(text: "Already have an account? "),
+                          const TextSpan(text: "Already have an account? "),
                           TextSpan(
                             text: 'Login',
                             style: TextStyle(
-                              color: Color(0xFF1BA0E2),
+                              color: const Color(0xFFFF7F50),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -207,17 +208,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
       obscureText: isPassword,
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(icon, color: const Color(0xFF1BA0E2).withOpacity(0.7)),
+        prefixIcon: Icon(icon, color: const Color(0xFFFF7F50).withOpacity(0.7)),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: Colors.grey.shade200),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFF1BA0E2), width: 2),
+          borderSide: const BorderSide(color: Color(0xFFFF7F50), width: 2),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
       ),
     );

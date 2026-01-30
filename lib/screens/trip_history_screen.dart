@@ -2,70 +2,118 @@ import 'package:flutter/material.dart';
 import '../models/trip_model.dart';
 import '../services/trip_service.dart';
 import 'trip_detail_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class TripHistoryScreen extends StatelessWidget {
   const TripHistoryScreen({super.key});
-
-  final Color primaryBlue = const Color(0xFF1BA0E2);
-  final Color darkNavy = const Color(0xFF1B4E6B);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F9),
-      appBar: AppBar(
-        elevation: 0,
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: darkNavy, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Trip History',
-          style: TextStyle(
-            color: darkNavy,
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
+      body: Column(
+        children: [
+          // CUSTOM HEADER
+          _buildHeader(context),
+
+          // LIST
+          Expanded(
+            child: StreamBuilder<List<Trip>>(
+              stream: TripService.loadUserTrips(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFFFF7F50),
+                      ),
+                    ),
+                  );
+                }
+
+                final allTrips = snapshot.data!;
+                final today = DateTime.now();
+
+                // FILTER ONLY PAST TRIPS
+                final pastTrips = allTrips
+                    .where(
+                      (t) => t.endDate.isBefore(
+                        DateTime(today.year, today.month, today.day),
+                      ),
+                    )
+                    .toList();
+
+                if (pastTrips.isEmpty) return _emptyState();
+
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+                  itemCount: pastTrips.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final trip = pastTrips[index];
+                    return _tripCard(context, trip);
+                  },
+                );
+              },
+            ),
           ),
-        ),
+        ],
       ),
+    );
+  }
 
-      body: StreamBuilder<List<Trip>>(
-        stream: TripService.loadUserTrips(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return Center(
-              child: CircularProgressIndicator(color: primaryBlue),
-            );
-          }
-
-          final allTrips = snapshot.data!;
-          final today = DateTime.now();
-
-          // FILTER ONLY PAST TRIPS
-          final pastTrips = allTrips
-              .where((t) => t.endDate.isBefore(
-                    DateTime(today.year, today.month, today.day),
-                  ))
-              .toList();
-
-          if (pastTrips.isEmpty) return _emptyState();
-
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            itemCount: pastTrips.length,
-            itemBuilder: (context, index) {
-              final trip = pastTrips[index];
-              return _tripCard(context, trip);
-            },
-          );
-        },
+  // ================= CUSTOM HEADER =================
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.grey.shade200),
+                color: Colors.white,
+              ),
+              child: const Icon(
+                Icons.arrow_back,
+                size: 20,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          const Text(
+            'Trip History',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(width: 44), // Spacer
+        ],
       ),
     );
   }
 
   Widget _tripCard(BuildContext context, Trip trip) {
+    final user = FirebaseAuth.instance.currentUser;
+    final bool isOwner = user != null && trip.ownerUid == user.uid;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -74,126 +122,161 @@ class TripHistoryScreen extends StatelessWidget {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
-              blurRadius: 15,
-              offset: const Offset(0, 6),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: IntrinsicHeight(
-          child: Row(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 6,
-                decoration: BoxDecoration(
-                  color: primaryBlue.withOpacity(0.3),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    bottomLeft: Radius.circular(24),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              /// Header: Destination + Badge
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            trip.destination.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: primaryBlue,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: trip.isGroup ? const Color(0xFFEAF5FD) : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              trip.isGroup ? 'Group Trip' : 'Solo Trip',
-                              style: TextStyle(
-                                color: trip.isGroup ? primaryBlue : Colors.grey.shade600,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        trip.groupName.isEmpty ? trip.destination : trip.groupName,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: darkNavy,
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF7F50).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.flag_rounded,
+                          size: 20,
+                          color: Color(0xFFFF7F50),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Row(
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey.shade400),
-                          const SizedBox(width: 6),
                           Text(
-                            '${trip.startDate.day}/${trip.startDate.month}/${trip.startDate.year} — '
-                            '${trip.endDate.day}/${trip.endDate.month}/${trip.endDate.year}',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                            trip.destination,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF111827),
                             ),
                           ),
-                        ],
-                      ),
-                      const Divider(height: 24, thickness: 0.8),
-                      Row(
-                        children: [
-                          _infoChip(Icons.people_outline_rounded, '${trip.travelers} Pax'),
-                          const SizedBox(width: 16),
-                          _infoChip(Icons.account_balance_wallet_outlined, 'RM ${trip.budget.toStringAsFixed(0)}'),
-                          const Spacer(),
-                          const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                          Text(
+                            "Completed",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
-                ),
+
+                  // Collaborative Badge
+                  if (!isOwner)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF8E1), // Pale Yellow
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.group_rounded,
+                            size: 12,
+                            color: Color(0xFFFFC107), // Amber
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            "SHARED",
+                            style: TextStyle(
+                              color: Color(0xFFFFA000),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+              Divider(height: 1, color: Colors.grey.shade100),
+              const SizedBox(height: 12),
+
+              /// Footer: Date + Info
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Date
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_rounded,
+                        size: 14,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${trip.startDate.day}/${trip.startDate.month} - ${trip.endDate.day}/${trip.endDate.month}',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Pax count
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline_rounded,
+                          size: 14,
+                          color: Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${trip.travelers}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _infoChip(IconData icon, String label) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey.shade500),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey.shade700,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
     );
   }
 
@@ -205,30 +288,28 @@ class TripHistoryScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(30),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: const Color(0xFFFF7F50).withOpacity(0.1),
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 20,
-                )
-              ],
             ),
-            child: Icon(Icons.map_outlined, size: 64, color: Colors.grey.shade300),
+            child: const Icon(
+              Icons.history_rounded,
+              size: 50,
+              color: Color(0xFFFF7F50),
+            ),
           ),
           const SizedBox(height: 24),
-          Text(
+          const Text(
             'Your travel diary is empty',
             style: TextStyle(
-              color: darkNavy,
+              color: Color(0xFF111827),
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Past trips will appear here.',
-            style: TextStyle(color: Colors.grey, fontSize: 14),
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
           ),
         ],
       ),

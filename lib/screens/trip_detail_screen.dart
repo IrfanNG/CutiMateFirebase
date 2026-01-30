@@ -1,11 +1,14 @@
-
 import 'package:flutter/material.dart';
 import '../models/trip_model.dart';
-import 'trip_chat_screen.dart';
+import 'trip_chat_screen.dart'; // Re-added
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'edit_trip_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'destination_vote_screen.dart';
+import 'trip_map_tab.dart';
+import 'location_picker_screen.dart';
+import 'package:latlong2/latlong.dart';
+import '../widgets/curved_bottom_clipper.dart';
 
 class TripDetailScreen extends StatefulWidget {
   final Trip trip;
@@ -18,11 +21,16 @@ class TripDetailScreen extends StatefulWidget {
 
 class _TripDetailScreenState extends State<TripDetailScreen> {
   int selectedTab = 0;
-  final List<String> tabs = ['Itinerary', 'Budget', 'Group', 'Checklist', 'Tasks'];
+  final List<String> tabs = [
+    'Itinerary',
+    'Expenses', // Renamed from Accommodation
+    'Group', // Renamed from Activities
+    'Checklist',
+    'Tasks',
+    'Map',
+  ];
 
-  final Color primaryBlue = const Color(0xFF1BA0E2);
-  final Color darkNavy = const Color(0xFF1B4E6B);
-  final Color bgGray = const Color(0xFFF6F7F9);
+  final Color bgGray = const Color(0xFFFFFBF6);
 
   late List<ItineraryItem> itinerary;
   late List<ExpenseItem> expenses;
@@ -45,16 +53,13 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         .collection("trips")
         .doc(widget.trip.id)
         .update({
-      "itinerary":
-          itinerary.map((e) => {"title": e.title, "time": e.time, "note": e.note}).toList(),
-      "expenses":
-          expenses.map((e) => {"title": e.title, "amount": e.amount}).toList(),
-      "members": members,
-      "tasks":
-          tasks.map((e) => {"title": e.title, "completed": e.completed}).toList(),
-      "checklist":
-          checklist.map((e) => {"title": e.title, "checked": e.isChecked}).toList()
-    });
+          "itinerary": itinerary.map((e) => e.toMap()).toList(),
+          "expenses": expenses.map((e) => e.toMap()).toList(),
+          "members": members,
+          "tasks": tasks.map((e) => e.toMap()).toList(),
+          "checklist": checklist.map((e) => e.toMap()).toList(),
+          "categoryAssignments": widget.trip.categoryAssignments,
+        });
   }
 
   @override
@@ -63,62 +68,18 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       backgroundColor: bgGray,
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.delete, color: Colors.white),
-                onPressed: _confirmDeleteTrip,
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit, color: Colors.white),
-                onPressed: () async {
-                  final updatedTrip = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EditTripScreen(trip: widget.trip),
-                    ),
-                  );
+          // 1. Hero Header
+          _buildHeroAppBar(),
 
-                  if (updatedTrip != null) {
-                    setState(() {
-                      widget.trip.title = updatedTrip.title;
-                      widget.trip.destination = updatedTrip.destination;
-                      widget.trip.startDate = updatedTrip.startDate;
-                      widget.trip.endDate = updatedTrip.endDate;
-                      widget.trip.travelers = updatedTrip.travelers;
-                      widget.trip.transport = updatedTrip.transport;
-                      widget.trip.accommodation = updatedTrip.accommodation;
-                      widget.trip.budget = updatedTrip.budget;
-                    });
-                  }
-                },
-              ),
-            ],
-            expandedHeight: 100,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: primaryBlue,
-            leading: const BackButton(color: Colors.white),
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 56, bottom: 14),
-              title: Text(
-                widget.trip.destination,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ),
+          // 2. Title & Info & Tabs
           SliverToBoxAdapter(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 16),
-                _summaryDashboard(),
+                _buildTitleSection(),
                 const SizedBox(height: 24),
                 _tabNavigation(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 _tabContent(),
                 const SizedBox(height: 120),
               ],
@@ -129,314 +90,393 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       floatingActionButton: _fab(),
     );
   }
-  void _confirmDeleteTrip() {
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text("Delete Trip?"),
-      content: const Text(
-          "This action cannot be undone. Do you really want to delete this trip?"),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
+
+  void _addTask(BuildContext context) {
+    final t = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("New Task"),
+        content: TextField(
+          controller: t,
+          decoration: const InputDecoration(labelText: "Description"),
         ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
           ),
-          onPressed: () async {
-            Navigator.pop(context);
-            await _deleteTrip();
-          },
-          child: const Text("Delete"),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7F50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              if (t.text.trim().isNotEmpty) {
+                setState(() => tasks.add(TaskItem(title: t.text.trim())));
+                await _saveToFirestore();
+              }
+              Navigator.pop(context);
+            },
+            child: const Text("Add"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Floating Action Button dependent on tab
+  Widget? _fab() {
+    switch (selectedTab) {
+      case 0: // Itinerary
+        return FloatingActionButton(
+          onPressed: _addItinerary,
+          backgroundColor: Theme.of(context).primaryColor,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.add_location_alt_outlined),
+        );
+      case 1: // Expenses
+        return FloatingActionButton(
+          onPressed: _addExpense,
+          backgroundColor: Theme.of(context).primaryColor,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.receipt_long),
+        );
+      case 3: // Checklist
+        return FloatingActionButton(
+          onPressed: () => _addChecklist(context),
+          backgroundColor: const Color(0xFFFF7F50),
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.add_task),
+        );
+      case 4: // Tasks
+        return FloatingActionButton(
+          onPressed: () => _addTask(context),
+          backgroundColor: const Color(0xFFFF7F50),
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.add_task),
+        );
+      default:
+        return null; // No FAB for Group or Map by default, or maybe Map needs one?
+      // User said "remove button at middle and just remain using action button".
+      // For Group, actions are usually internal (Invite etc).
+      // For Map, maybe current location?
+    }
+  }
+
+  void _confirmDeleteTrip() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Delete Trip?"),
+        content: const Text(
+          "This action cannot be undone. Do you really want to delete this trip?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteTrip();
+            },
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteTrip() async {
+    try {
+      final tripRef = FirebaseFirestore.instance
+          .collection("trips")
+          .doc(widget.trip.id);
+
+      // Delete Subcollections (messages, etc.)
+      await _deleteSubCollection(tripRef, "messages");
+
+      // Delete main trip
+      await tripRef.delete();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Trip deleted successfully")),
+      );
+
+      Navigator.pop(context); // go back to previous screen
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Delete failed: $e")));
+    }
+  }
+
+  Future<void> _deleteSubCollection(
+    DocumentReference parentRef,
+    String collectionName,
+  ) async {
+    final snapshots = await parentRef.collection(collectionName).get();
+
+    for (var doc in snapshots.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  // ================= HERO HEADER =================
+  Widget _buildHeroAppBar() {
+    return SliverAppBar(
+      expandedHeight: 300,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      pinned: true,
+      stretch: true,
+      leading: Container(
+        margin: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.3),
+          shape: BoxShape.circle,
+        ),
+        child: const BackButton(color: Colors.white),
+      ),
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.3),
+            shape: BoxShape.circle,
+          ),
+          child: IconButton(
+            icon: const Icon(
+              Icons.share_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            onPressed: () {
+              // Share logic
+            },
+          ),
+        ),
+        Container(
+          margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.3),
+            shape: BoxShape.circle,
+          ),
+          child: PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz, color: Colors.white),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            onSelected: (value) {
+              if (value == 'delete') {
+                _confirmDeleteTrip();
+              } else if (value == 'edit') {
+                // Trigger edit
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditTripScreen(trip: widget.trip),
+                  ),
+                ).then((updatedTrip) {
+                  if (updatedTrip != null) {
+                    setState(() {
+                      // Update logic
+                      widget.trip.title = updatedTrip.title;
+                      widget.trip.destination = updatedTrip.destination;
+                      widget.trip.startDate = updatedTrip.startDate;
+                      widget.trip.endDate = updatedTrip.endDate;
+                      widget.trip.travelers = updatedTrip.travelers;
+                      widget.trip.transport = updatedTrip.transport;
+                      widget.trip.accommodation = updatedTrip.accommodation;
+                      widget.trip.budget = updatedTrip.budget;
+                    });
+                  }
+                });
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 20, color: Colors.black87),
+                    SizedBox(width: 12),
+                    Text("Edit Trip"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 20, color: Colors.red),
+                    SizedBox(width: 12),
+                    Text("Delete Trip", style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
-    ),
-  );
-}
-Future<void> _deleteTrip() async {
-  try {
-    final tripRef = FirebaseFirestore.instance
-        .collection("trips")
-        .doc(widget.trip.id);
-
-    // Delete Subcollections (messages, etc.)
-    await _deleteSubCollection(tripRef, "messages");
-
-    // Delete main trip
-    await tripRef.delete();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Trip deleted successfully")),
-    );
-
-    Navigator.pop(context); // go back to previous screen
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Delete failed: $e")),
-    );
-  }
-}
-Future<void> _deleteSubCollection(
-    DocumentReference parentRef, String collectionName) async {
-  final snapshots = await parentRef.collection(collectionName).get();
-
-  for (var doc in snapshots.docs) {
-    await doc.reference.delete();
-  }
-}
-void _editTripDetails() {
-  final title = TextEditingController(text: widget.trip.title);
-  final destination = TextEditingController(text: widget.trip.destination);
-  final travelers = TextEditingController(text: widget.trip.travelers.toString());
-  final transport = TextEditingController(text: widget.trip.transport);
-  final accommodation = TextEditingController(text: widget.trip.accommodation);
-  final budget = TextEditingController(text: widget.trip.budget.toString());
-
-  DateTime start = widget.trip.startDate;
-  DateTime end = widget.trip.endDate;
-
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text("Edit Trip Details"),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Stack(
+          fit: StackFit.expand,
           children: [
-            TextField(controller: title, decoration: const InputDecoration(labelText: "Trip Title")),
-            TextField(controller: destination, decoration: const InputDecoration(labelText: "Destination")),
-
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                TextButton(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: start,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setState(() => start = picked);
-                    }
-                  },
-                  child: Text("Start: ${start.day}/${start.month}/${start.year}"),
-                ),
-
-                TextButton(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: end,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setState(() => end = picked);
-                    }
-                  },
-                  child: Text("End: ${end.day}/${end.month}/${end.year}"),
-                ),
-              ],
+            // Background Image
+            ClipPath(
+              clipper: CurvedBottomClipper(),
+              child: Image.network(
+                // Use a destination image based on trip destination if possible, else placeholder
+                _getImageForDestination(widget.trip.destination),
+                fit: BoxFit.cover,
+              ),
             ),
-
-            TextField(
-              controller: travelers,
-              decoration: const InputDecoration(labelText: "Travelers"),
-              keyboardType: TextInputType.number,
-            ),
-
-            TextField(controller: transport, decoration: const InputDecoration(labelText: "Transport")),
-            TextField(controller: accommodation, decoration: const InputDecoration(labelText: "Accommodation")),
-
-            TextField(
-              controller: budget,
-              decoration: const InputDecoration(labelText: "Budget (RM)"),
-              keyboardType: TextInputType.number,
+            // Gradient
+            ClipPath(
+              clipper: CurvedBottomClipper(),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black.withOpacity(0.4), Colors.transparent],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            await _saveTripDetails(
-              title.text,
-              destination.text,
-              start,
-              end,
-              int.tryParse(travelers.text) ?? 1,
-              transport.text,
-              accommodation.text,
-              double.tryParse(budget.text) ?? 0,
-            );
-
-            Navigator.pop(context);
-          },
-          child: const Text("Save"),
-        ),
-      ],
-    ),
-  );
-}
-Future<void> _saveTripDetails(
-  String title,
-  String destination,
-  DateTime start,
-  DateTime end,
-  int travelers,
-  String transport,
-  String accommodation,
-  double budget,
-) async {
-
-  await FirebaseFirestore.instance
-      .collection("trips")
-      .doc(widget.trip.id)
-      .update({
-    "title": title,
-    "destination": destination,
-    "startDate": start.millisecondsSinceEpoch,
-    "endDate": end.millisecondsSinceEpoch,
-    "travelers": travelers,
-    "transport": transport,
-    "accommodation": accommodation,
-    "budget": budget,
-  });
-
-  // Update UI immediately
-  setState(() {
-    widget.trip.title = title;
-    widget.trip.destination = destination;
-    widget.trip.startDate = start;
-    widget.trip.endDate = end;
-    widget.trip.travelers = travelers;
-    widget.trip.transport = transport;
-    widget.trip.accommodation = accommodation;
-    widget.trip.budget = budget;
-  });
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text("Trip updated successfully")),
-  );
-}
-
-
-  // ================= SUMMARY =================
-  Widget _summaryDashboard() {
-    final trip = widget.trip;
-    final today = DateTime.now();
-
-    final isPastTrip = trip.endDate.isBefore(
-      DateTime(today.year, today.month, today.day),
     );
+  }
 
+  String _getImageForDestination(String destination) {
+    String lower = destination.toLowerCase();
+    if (lower.contains('bali'))
+      return 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1000';
+    if (lower.contains('kyoto'))
+      return 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1000';
+    if (lower.contains('paris'))
+      return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1000';
+    return 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=2070&auto=format&fit=crop';
+  }
+
+  // ================= TITLE SECTION =================
+  Widget _buildTitleSection() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10))
-            ]),
-        child: Column(children: [
-          Row(children: [
-            const Icon(Icons.calendar_today_rounded, size: 16, color: Colors.grey),
-            const SizedBox(width: 8),
-            Text(
-              '${trip.startDate.day}/${trip.startDate.month} - ${trip.endDate.day}/${trip.endDate.month}',
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, color: Colors.black87),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.trip.title.isNotEmpty
+                ? widget.trip.title
+                : widget.trip.destination,
+            style: const TextStyle(
+              fontFamily: 'Serif', // Try to get that elegant look
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
             ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: isPastTrip
-                    ? Colors.red.withOpacity(0.1)
-                    : Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                isPastTrip ? "COMPLETED" : "ACTIVE",
-                style: TextStyle(
-                    color: isPastTrip ? Colors.red : Colors.green,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold),
-              ),
-            ),
-          ]),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Divider(height: 1),
           ),
+          const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _dashItem(Icons.people_outline, '${trip.travelers}', 'Pax'),
-              _dashItem(Icons.account_balance_wallet_outlined,
-                  'RM ${trip.budget.toStringAsFixed(0)}', 'Budget'),
-              _dashItem(Icons.local_taxi_outlined, trip.transport, 'Mode'),
+              // Date Badge
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF7F50).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today_rounded,
+                      size: 14,
+                      color: Color(0xFFFF7F50),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_formatDate(widget.trip.startDate)} - ${_formatDate(widget.trip.endDate)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFFF7F50),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                "${widget.trip.endDate.difference(widget.trip.startDate).inDays} Days • ${widget.trip.travelers} Travelers",
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+              ),
             ],
-          )
-        ]),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _dashItem(IconData icon, String v, String l) =>
-      Column(children: [
-        Icon(icon, color: primaryBlue, size: 24),
-        const SizedBox(height: 6),
-        Text(v, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-        Text(l, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-      ]);
+  String _formatDate(DateTime date) {
+    const months = [
+      "OCT",
+      "NOV",
+      "DEC",
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+    ];
+    return "${months[(date.month % 12 + 9) % 12]} ${date.day}"; // Correct mapping logic roughly or just use simpler
+  }
 
   // ================= TABS =================
   Widget _tabNavigation() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: List.generate(tabs.length, (index) {
           final active = selectedTab == index;
           return GestureDetector(
             onTap: () => setState(() => selectedTab = index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin: const EdgeInsets.only(right: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Container(
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
               decoration: BoxDecoration(
-                color: active ? darkNavy : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: active
-                    ? [
-                        BoxShadow(
-                            color: darkNavy.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4))
-                      ]
-                    : [],
+                color: active ? const Color(0xFFFF7F50) : Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: active ? Colors.transparent : Colors.grey.shade300,
+                ),
               ),
               child: Text(
                 tabs[index],
                 style: TextStyle(
-                    color: active ? Colors.white : Colors.grey.shade600,
-                    fontWeight: FontWeight.bold),
+                  color: active ? Colors.white : Colors.grey.shade600,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
           );
@@ -447,297 +487,54 @@ Future<void> _saveTripDetails(
 
   Widget _tabContent() {
     switch (selectedTab) {
-      case 0: return _itinerary();
-      case 1: return _budget();
-      case 2: return _group();
-      case 3: return _checklist();
-      case 4: return _tasks();
-      default: return const SizedBox();
+      case 0:
+        return _itinerary();
+      case 1:
+        return _budget();
+      case 2:
+        return _group();
+      case 3:
+        return _checklist();
+      case 4:
+        return _tasks();
+      case 5:
+        return SizedBox(height: 600, child: TripMapTab(itinerary: itinerary));
+      default:
+        return const SizedBox();
     }
   }
 
   // ================= ITINERARY =================
   Widget _itinerary() {
-    if (itinerary.isEmpty) return _empty("No itinerary");
+    if (itinerary.isEmpty) {
+      return Column(
+        children: [_empty("No itinerary items yet. Use the + button to add.")],
+      );
+    }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      itemCount: itinerary.length,
-      itemBuilder: (context, index) {
-        final item = itinerary[index];
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8)
-              ]),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(item.title,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold)),
-                    Text(item.time, style: TextStyle(color: primaryBlue)),
-                    Text(item.note)
-                  ])),
-              Row(children: [
-                IconButton(
-                    icon: Icon(Icons.edit, color: primaryBlue),
-                    onPressed: () => _editItinerary(index)),
-                IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _deleteItinerary(index)),
-              ])
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _editItinerary(int i) {
-    final t = TextEditingController(text: itinerary[i].title);
-    final ti = TextEditingController(text: itinerary[i].time);
-    final n = TextEditingController(text: itinerary[i].note);
-
-    showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-              title: const Text("Edit Itinerary"),
-              content: Column(mainAxisSize: MainAxisSize.min, children: [
-                TextField(controller: t, decoration: const InputDecoration(labelText: "Title")),
-                TextField(controller: ti, decoration: const InputDecoration(labelText: "Time")),
-                TextField(controller: n, decoration: const InputDecoration(labelText: "Note")),
-              ]),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-                ElevatedButton(
-                    onPressed: () async {
-                      setState(() =>
-                          itinerary[i] = ItineraryItem(title: t.text, time: ti.text, note: n.text));
-                      await _saveToFirestore();
-                      Navigator.pop(context);
-                    },
-                    child: const Text("Save"))
-              ],
-            ));
-  }
-
-  void _deleteItinerary(int i) async {
-    setState(() => itinerary.removeAt(i));
-    await _saveToFirestore();
-  }
-
-  // ================= BUDGET =================
-  Widget _budget() {
-  final totalSpent = expenses.fold(0.0, (sum, e) => sum + e.amount);
-  final remaining = widget.trip.budget - totalSpent;
-  final perPerson = widget.trip.travelers == 0
-      ? 0.0
-      : totalSpent / widget.trip.travelers;
-
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Column(
-      children: [
-        // ===== SUMMARY CARD =====
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [primaryBlue, darkNavy]),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: darkNavy.withOpacity(0.3),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
-              )
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Trip Budget Summary",
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Text(
-                "Total Budget: RM ${widget.trip.budget.toStringAsFixed(2)}",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              Text(
-                "Total Spent: RM ${totalSpent.toStringAsFixed(2)}",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              Text(
-                "Remaining: RM ${remaining.toStringAsFixed(2)}",
-                style: TextStyle(
-                  color: remaining >= 0
-                      ? Colors.lightGreenAccent
-                      : Colors.redAccent,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // ===== AUTO COST SPLIT =====
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  "Each person pays: RM ${perPerson.toStringAsFixed(2)}",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        // ===== EXPENSE LIST =====
-        if (expenses.isEmpty)
-          _emptyState(
-            "No expenses recorded",
-            Icons.account_balance_wallet_outlined,
-          )
-        else
-          ...expenses.map((e) {
-            int index = expenses.indexOf(e);
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: ListTile(
-                title: Text(e.title),
-                subtitle: Text("RM ${e.amount.toStringAsFixed(2)}"),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.edit, color: primaryBlue),
-                      onPressed: () => _editExpense(index),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteExpense(index),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          })
-      ],
-    ),
-  );
-}
-  Widget _emptyState(String message, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.all(40),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 48, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: TextStyle(color: Colors.grey.shade500),
+          // Mock Day Header for visual separation
+          _dayHeader("01", "Arrival & Oasis"),
+
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: itinerary.length,
+            itemBuilder: (context, index) {
+              final item = itinerary[index];
+              return _itineraryCard(item, index);
+            },
           ),
+
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
-
-  void _deleteExpense(int index) async {
-    setState(() => expenses.removeAt(index));
-    await _saveToFirestore();
-  }
-void _editExpense(int index) {
-  final title = TextEditingController(text: expenses[index].title);
-  final amount = TextEditingController(text: expenses[index].amount.toString());
-
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text("Edit Expense"),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-              controller: title,
-              decoration: const InputDecoration(labelText: "Title")),
-          TextField(
-            controller: amount,
-            decoration: const InputDecoration(labelText: "Amount"),
-            keyboardType: TextInputType.number,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel")),
-        ElevatedButton(
-          onPressed: () async {
-            setState(() {
-              expenses[index] = ExpenseItem(
-                title: title.text,
-                amount: double.tryParse(amount.text) ?? 0,
-              );
-            });
-
-            await _saveToFirestore();
-            Navigator.pop(context);
-          },
-          child: const Text("Save"),
-        ),
-      ],
-    ),
-  );
-}
-
 
   // ================= GROUP =================
   Widget _group() {
@@ -748,107 +545,525 @@ void _editExpense(int index) {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
+          _sectionHeader("Group Members"),
+          const SizedBox(height: 12),
 
-          /// ================= MEMBERS LIST =================
-          ...members.map((m) {
-            final bool memberIsOwner = m == widget.trip.ownerUid;
+          if (members.isEmpty)
+            const Text("No members yet")
+          else
+            ...members.map((m) {
+              final bool memberIsOwner = m == widget.trip.ownerUid;
 
-            return Card(
-              child: ListTile(
-                leading: CircleAvatar(
-                  child: Text(m[0].toUpperCase()),
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
-                title: Text(m),
-                trailing: memberIsOwner
-                    ? const Text(
-                        "Owner",
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    :
-                    /// Owner can remove members
-                    isOwner
-                        ? IconButton(
-                            icon: const Icon(Icons.remove_circle,
-                                color: Colors.red),
-                            onPressed: () => _confirmRemoveMember(m),
-                          )
-                        : null,
-              ),
-            );
-          }).toList(),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFFFF7F50).withOpacity(0.1),
+                    foregroundColor: const Color(0xFFFF7F50),
+                    child: Text(
+                      m.isNotEmpty ? m[0].toUpperCase() : '?',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  title: Text(
+                    m,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  trailing: memberIsOwner
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF7F50).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFFFF7F50).withOpacity(0.3),
+                            ),
+                          ),
+                          child: const Text(
+                            "Owner",
+                            style: TextStyle(
+                              color: Color(0xFFFF7F50),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                          ),
+                        )
+                      : isOwner
+                      ? IconButton(
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            color: Colors.red,
+                          ),
+                          onPressed: () => _confirmRemoveMember(m),
+                        )
+                      : null,
+                ),
+              );
+            }),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
+          _sectionHeader("Actions"),
+          const SizedBox(height: 12),
 
-          /// ================= VOTE DESTINATION =================
-          ElevatedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => DestinationVoteScreen(tripId: widget.trip.id),
-              ),
-            ),
-            icon: const Icon(Icons.how_to_vote),
-            label: const Text("Vote Destination"),
-          ),
-
-
-          /// ================= INVITE MEMBER =================
-          if (isOwner)
-            ElevatedButton.icon(
-              onPressed: () => _inviteMember(context),
-              icon: const Icon(Icons.person_add),
-              label: const Text("Invite Member"),
-            ),
-
-          /// ================= LEAVE GROUP (FOR PARTICIPANTS) =================
-          if (!isOwner) ...[
-            const SizedBox(height: 10),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-              ),
-              onPressed: _leaveGroup,
-              icon: const Icon(Icons.logout),
-              label: const Text("Leave Group"),
-            ),
-          ],
-
-          const SizedBox(height: 10),
-
-          /// ================= CHAT =================
-          ElevatedButton.icon(
-            onPressed: () => Navigator.push(
+          // Group Chat
+          _groupActionButton(
+            "Group Chat",
+            Icons.chat_bubble_outline_rounded,
+            () => Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => TripChatScreen(trip: widget.trip),
               ),
             ),
-            icon: const Icon(Icons.chat),
-            label: const Text("Enter Group Chat"),
+            color: Colors.deepPurple,
+          ),
+          const SizedBox(height: 12),
+
+          // Destination Vote
+          _groupActionButton(
+            "Destination Vote",
+            Icons.poll_outlined,
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DestinationVoteScreen(tripId: widget.trip.id),
+              ),
+            ),
+            color: const Color(0xFFFF7F50),
+          ),
+          const SizedBox(height: 12),
+          const SizedBox(height: 12),
+
+          // Invite
+          if (isOwner)
+            _groupActionButton(
+              "Invite New Member",
+              Icons.person_add_alt_1_outlined,
+              () => _inviteMember(context),
+              color: Colors.teal,
+            ),
+
+          // Leave
+          if (!isOwner) ...[
+            const SizedBox(height: 12),
+            _groupActionButton(
+              "Leave Group",
+              Icons.logout_rounded,
+              _leaveGroup,
+              isDanger: true,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade400,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _groupActionButton(
+    String label,
+    IconData icon,
+    VoidCallback onPressed, {
+    bool isDanger = false,
+    Color color = Colors.black87,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          backgroundColor: isDanger ? Colors.red.shade50 : Colors.white,
+          foregroundColor: isDanger ? Colors.red : color,
+          elevation: 0,
+          side: BorderSide(
+            color: isDanger ? Colors.red.shade100 : Colors.grey.shade200,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          alignment: Alignment.centerLeft,
+        ),
+        onPressed: onPressed,
+        icon: Icon(icon, size: 22),
+        label: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _leaveGroup() async {
+    final user = FirebaseAuth.instance.currentUser!;
+    final email = user.email!;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Leave Group?"),
+        content: const Text("You will lose access to this trip."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Leave"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      members.remove(email);
+    });
+
+    await FirebaseFirestore.instance
+        .collection("trips")
+        .doc(widget.trip.id)
+        .update({"members": members});
+
+    if (mounted) Navigator.pop(context);
+  }
+
+  void _confirmRemoveMember(String email) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Remove Member"),
+        content: Text("Remove $email from this trip?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              setState(() {
+                members.remove(email);
+              });
+
+              await FirebaseFirestore.instance
+                  .collection("trips")
+                  .doc(widget.trip.id)
+                  .update({"members": members});
+
+              Navigator.pop(context);
+            },
+            child: const Text("Remove"),
           ),
         ],
       ),
     );
   }
-  void _createVote(BuildContext context) {
-    final q = TextEditingController();
-    final opt1 = TextEditingController();
-    final opt2 = TextEditingController();
+
+  Widget _dayHeader(String dayNum, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16, top: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: Color(0xFFE0F2F1), // Soft teal
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, size: 14, color: Color(0xFF00695C)),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            "Day $dayNum: $title",
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+              fontFamily: 'Serif',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _itineraryCard(ItineraryItem item, int index) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image Section
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: Image.network(
+              // Randomize or pick based on item title keyword
+              _getItineraryImage(item.title),
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+
+          // Content Section
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                          fontFamily: 'Serif',
+                        ),
+                      ),
+                    ),
+                    // Checkbox or Status
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check,
+                        size: 16,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "${item.time} • Private Transfer", // Mock extra detail
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (item.note.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    item.note,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+
+                // Action Buttons (Edit/Delete) - Mini styling
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        size: 20,
+                        color: Colors.black45,
+                      ),
+                      onPressed: () => _editItinerary(index),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 20,
+                        color: Colors.black45,
+                      ),
+                      onPressed: () => _deleteItinerary(index),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getItineraryImage(String title) {
+    String lower = title.toLowerCase();
+    if (lower.contains('food') ||
+        lower.contains('lunch') ||
+        lower.contains('dinner'))
+      return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1000';
+    if (lower.contains('hotel') || lower.contains('check-in'))
+      return 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1000';
+    if (lower.contains('beach'))
+      return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000';
+    if (lower.contains('temple'))
+      return 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1000';
+
+    return 'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?q=80&w=1000'; // Default resorty
+  }
+
+  // Reusable Location Picker for Edit
+  void _editItinerary(int i) {
+    final t = TextEditingController(text: itinerary[i].title);
+    final ti = TextEditingController(text: itinerary[i].time);
+    final n = TextEditingController(text: itinerary[i].note);
+    double? selectedLat = itinerary[i].lat;
+    double? selectedLng = itinerary[i].lng;
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Create Vote"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: q, decoration: const InputDecoration(labelText: "Question")),
-            TextField(controller: opt1, decoration: const InputDecoration(labelText: "Option 1")),
-            TextField(controller: opt2, decoration: const InputDecoration(labelText: "Option 2")),
-          ],
+        title: const Text("Edit Itinerary"),
+        content: StatefulBuilder(
+          builder: (context, setStateSB) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: t,
+                  decoration: const InputDecoration(labelText: "Title"),
+                ),
+                TextField(
+                  controller: ti,
+                  decoration: const InputDecoration(labelText: "Time"),
+                ),
+                TextField(
+                  controller: n,
+                  decoration: const InputDecoration(labelText: "Note"),
+                ),
+                const SizedBox(height: 16),
+
+                // Location Selector
+                InkWell(
+                  onTap: () async {
+                    final LatLng? result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LocationPickerScreen(
+                          initialLocation: selectedLat != null
+                              ? LatLng(selectedLat!, selectedLng!)
+                              : null,
+                        ),
+                      ),
+                    );
+
+                    if (result != null) {
+                      setStateSB(() {
+                        selectedLat = result.latitude;
+                        selectedLng = result.longitude;
+                      });
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.grey.shade50,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedLat != null
+                              ? Icons.location_on
+                              : Icons.add_location_alt,
+                          color: selectedLat != null ? Colors.red : Colors.grey,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            selectedLat != null
+                                ? "Change Location"
+                                : "Pick Location on Map",
+                            style: TextStyle(
+                              color: selectedLat != null
+                                  ? Colors.black87
+                                  : Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        if (selectedLat != null) ...[
+                          Text(
+                            "Set",
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () {
+                              setStateSB(() {
+                                selectedLat = null;
+                                selectedLng = null;
+                              });
+                            },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
         actions: [
           TextButton(
@@ -856,102 +1071,553 @@ void _editExpense(int index) {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7F50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection("trips")
-                  .doc(widget.trip.id)
-                  .collection("votes")
-                  .add({
-                "question": q.text,
-                "isClosed": false,
-                "options": [
-                  {"name": opt1.text, "votes": []},
-                  {"name": opt2.text, "votes": []},
-                ]
-              });
-
+              setState(
+                () => itinerary[i] = ItineraryItem(
+                  title: t.text,
+                  time: ti.text,
+                  note: n.text,
+                  lat: selectedLat,
+                  lng: selectedLng,
+                ),
+              );
+              await _saveToFirestore();
               Navigator.pop(context);
             },
-            child: const Text("Create"),
+            child: const Text("Save"),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _leaveGroup() async {
-  final user = FirebaseAuth.instance.currentUser!;
-  final email = user.email!;
+  void _deleteItinerary(int i) async {
+    setState(() => itinerary.removeAt(i));
+    await _saveToFirestore();
+  }
 
-  final confirm = await showDialog<bool>(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text("Leave Group?"),
-      content: const Text("You will lose access to this trip."),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel")),
-        ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Leave")),
-      ],
-    ),
-  );
+  void _addExpense() {
+    final t = TextEditingController();
+    final a = TextEditingController();
+    String category = 'Other';
+    final categories = [
+      'Food',
+      'Transport',
+      'Accommodation',
+      'Entertainment',
+      'Shopping',
+      'Other',
+    ];
 
-  if (confirm != true) return;
-
-  setState(() {
-    members.remove(email);
-  });
-
-  await FirebaseFirestore.instance
-      .collection("trips")
-      .doc(widget.trip.id)
-      .update({
-    "members": members,
-  });
-
-  if (mounted) Navigator.pop(context);
-}
-
-void _confirmRemoveMember(String email) {
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text("Remove Member"),
-      content: Text("Remove $email from this trip?"),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            setState(() {
-              members.remove(email);
-            });
-
-            await FirebaseFirestore.instance
-                .collection("trips")
-                .doc(widget.trip.id)
-                .update({
-              "members": members,
-            });
-
-            Navigator.pop(context);
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Add Expense"),
+        content: StatefulBuilder(
+          builder: (context, setStateSB) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: t,
+                  decoration: const InputDecoration(
+                    labelText: "Title (e.g. Lunch)",
+                  ),
+                ),
+                TextField(
+                  controller: a,
+                  decoration: const InputDecoration(labelText: "Amount (RM)"),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: category,
+                  decoration: const InputDecoration(labelText: "Category"),
+                  items: categories
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (v) => setStateSB(() => category = v!),
+                ),
+              ],
+            );
           },
-          child: const Text("Remove"),
         ),
-      ],
-    ),
-  );
-}
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7F50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              setState(() {
+                expenses.add(
+                  ExpenseItem(
+                    title: t.text,
+                    amount: double.tryParse(a.text) ?? 0,
+                    category: category,
+                  ),
+                );
+              });
+              await _saveToFirestore();
+              Navigator.pop(context);
+            },
+            child: const Text("Add"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addItinerary() {
+    final t = TextEditingController();
+    final ti = TextEditingController();
+    final n = TextEditingController();
+    double? selectedLat;
+    double? selectedLng;
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Add Itinerary Item"),
+        content: StatefulBuilder(
+          builder: (context, setStateSB) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: t,
+                  decoration: const InputDecoration(
+                    labelText: "Title (e.g. Dinner)",
+                  ),
+                ),
+                TextField(
+                  controller: ti,
+                  decoration: const InputDecoration(
+                    labelText: "Time (e.g. 7:00 PM)",
+                  ),
+                ),
+                TextField(
+                  controller: n,
+                  decoration: const InputDecoration(labelText: "Note"),
+                ),
+                const SizedBox(height: 16),
+
+                // Location Selector
+                InkWell(
+                  onTap: () async {
+                    final LatLng? result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const LocationPickerScreen(),
+                      ),
+                    );
+
+                    if (result != null) {
+                      setStateSB(() {
+                        selectedLat = result.latitude;
+                        selectedLng = result.longitude;
+                      });
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.grey.shade50,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedLat != null
+                              ? Icons.location_on
+                              : Icons.add_location_alt,
+                          color: selectedLat != null ? Colors.red : Colors.grey,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            selectedLat != null
+                                ? "Location Selected"
+                                : "Pick Location on Map",
+                            style: TextStyle(
+                              color: selectedLat != null
+                                  ? Colors.black87
+                                  : Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        if (selectedLat != null)
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () {
+                              setStateSB(() {
+                                selectedLat = null;
+                                selectedLng = null;
+                              });
+                            },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7F50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              setState(
+                () => itinerary.add(
+                  ItineraryItem(
+                    title: t.text,
+                    time: ti.text,
+                    note: n.text,
+                    lat: selectedLat,
+                    lng: selectedLng,
+                  ),
+                ),
+              );
+              await _saveToFirestore();
+              Navigator.pop(context);
+            },
+            child: const Text("Add"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= BUDGET =================
+  Widget _budget() {
+    final user = FirebaseAuth.instance.currentUser!;
+    final bool isOwner = widget.trip.ownerUid == user.uid;
+
+    // Calculate Total Spent
+    final totalSpent = expenses.fold(0.0, (sum, e) => sum + e.amount);
+    final remaining = widget.trip.budget - totalSpent;
+
+    // Calculate My Allocations
+    double myCost = 0.0;
+    final int memberCount = members.isEmpty ? 1 : members.length;
+
+    // Attempt to identify "Me" in the members list.
+    // If we can't find exact match, we might fallback or show just split.
+    // Based on `_inviteMember`, members list contains Emails.
+    final String myId = user.email ?? "";
+
+    for (var e in expenses) {
+      String assignedTo =
+          widget.trip.categoryAssignments[e.category] ?? 'Split Equally';
+
+      if (assignedTo == 'Split Equally') {
+        myCost += e.amount / memberCount;
+      } else if (assignedTo == myId) {
+        myCost += e.amount;
+      }
+      // If assigned to someone else, do not add to myCost.
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          // ===== SUMMARY CARD =====
+          // ===== SUMMARY CARD =====
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Trip Budget Summary",
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                Text(
+                  "Total Budget: RM ${widget.trip.budget.toStringAsFixed(2)}",
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                Text(
+                  "Total Spent: RM ${totalSpent.toStringAsFixed(2)}",
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                Text(
+                  "Remaining: RM ${remaining.toStringAsFixed(2)}",
+                  style: TextStyle(
+                    color: remaining >= 0
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // ===== MY ESTIMATED COST =====
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.person_outline,
+                        size: 20,
+                        color: Colors.black54,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "My Cost: RM ${myCost.toStringAsFixed(2)}",
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      if (isOwner)
+                        GestureDetector(
+                          onTap: () => _showBudgetSettings(context),
+                          child: const Icon(
+                            Icons.settings_outlined,
+                            size: 20,
+                            color: Colors.black54,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ===== EXPENSE LIST =====
+          if (expenses.isEmpty)
+            Column(
+              children: [
+                _emptyState(
+                  "No expenses recorded. Tap + to add.",
+                  Icons.account_balance_wallet_outlined,
+                ),
+              ],
+            )
+          else
+            ...expenses.map((e) {
+              int index = expenses.indexOf(e);
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: ListTile(
+                  title: Text(
+                    e.title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text("RM ${e.amount.toStringAsFixed(2)}"),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                          color: Colors.black54,
+                        ),
+                        onPressed: () => _editExpense(index),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Colors.black26,
+                        ),
+                        onPressed: () => _deleteExpense(index),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyState(String message, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        children: [
+          Icon(icon, size: 48, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(message, style: TextStyle(color: Colors.grey.shade500)),
+        ],
+      ),
+    );
+  }
+
+  void _deleteExpense(int index) async {
+    setState(() => expenses.removeAt(index));
+    await _saveToFirestore();
+  }
+
+  void _editExpense(int index) {
+    final title = TextEditingController(text: expenses[index].title);
+    final amount = TextEditingController(
+      text: expenses[index].amount.toString(),
+    );
+    String category = expenses[index].category;
+    final categories = [
+      'Food',
+      'Transport',
+      'Accommodation',
+      'Entertainment',
+      'Shopping',
+      'Other',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Edit Expense"),
+        content: StatefulBuilder(
+          builder: (context, setStateSB) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: title,
+                  decoration: const InputDecoration(labelText: "Title"),
+                ),
+                TextField(
+                  controller: amount,
+                  decoration: const InputDecoration(labelText: "Amount"),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: category,
+                  decoration: const InputDecoration(labelText: "Category"),
+                  items: categories
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (v) => setStateSB(() => category = v!),
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7F50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              setState(() {
+                expenses[index] = ExpenseItem(
+                  title: title.text,
+                  amount: double.tryParse(amount.text) ?? 0,
+                  category: category,
+                );
+              });
+
+              await _saveToFirestore();
+              Navigator.pop(context);
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ... (keeping implementation details) ...
 
   // ================= CHECKLIST =================
   Widget _checklist() {
-    if (checklist.isEmpty) return _empty("No checklist");
+    if (checklist.isEmpty) {
+      return Column(children: [_empty("No checklist items. Tap + to add.")]);
+    }
 
+    // ... (rest of checklist) ...
     return Column(
       children: checklist.asMap().entries.map((entry) {
         int i = entry.key;
@@ -962,40 +1628,65 @@ void _confirmRemoveMember(String email) {
           title: Text(
             item.title,
             style: TextStyle(
-                decoration: item.isChecked ? TextDecoration.lineThrough : null),
+              decoration: item.isChecked ? TextDecoration.lineThrough : null,
+            ),
           ),
           onChanged: (v) async {
             setState(() => item.isChecked = v!);
             await _saveToFirestore();
           },
-          secondary: Row(mainAxisSize: MainAxisSize.min, children: [
-            IconButton(icon: Icon(Icons.edit, color: primaryBlue), onPressed: () => _editChecklist(i)),
-            IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteChecklist(i)),
-          ]),
+          secondary: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: Colors.black54),
+                onPressed: () => _editChecklist(i),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.black26,
+                ),
+                onPressed: () => _deleteChecklist(i),
+              ),
+            ],
+          ),
         );
       }).toList(),
     );
   }
 
   void _editChecklist(int i) {
-    final t = TextEditingController(text: checklist[i].title);
+    var t = TextEditingController(text: checklist[i].title);
 
     showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-              title: const Text("Edit Checklist"),
-              content: TextField(controller: t),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-                ElevatedButton(
-                    onPressed: () async {
-                      setState(() => checklist[i].title = t.text);
-                      await _saveToFirestore();
-                      Navigator.pop(context);
-                    },
-                    child: const Text("Save"))
-              ],
-            ));
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Edit Checklist"),
+        content: TextField(controller: t),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7F50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              setState(() => checklist[i].title = t.text);
+              await _saveToFirestore();
+              Navigator.pop(context);
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _deleteChecklist(int i) async {
@@ -1003,9 +1694,13 @@ void _confirmRemoveMember(String email) {
     await _saveToFirestore();
   }
 
+  // ...
+
   // ================= TASKS =================
   Widget _tasks() {
-    if (tasks.isEmpty) return _empty("No tasks");
+    if (tasks.isEmpty) {
+      return Column(children: [_empty("No tasks. Tap + to add.")]);
+    }
 
     return Column(
       children: tasks.asMap().entries.map((entry) {
@@ -1019,10 +1714,19 @@ void _confirmRemoveMember(String email) {
             setState(() => task.completed = v!);
             await _saveToFirestore();
           },
-          secondary: Row(mainAxisSize: MainAxisSize.min, children: [
-            IconButton(icon: Icon(Icons.edit, color: primaryBlue), onPressed: () => _editTask(i)),
-            IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteTask(i)),
-          ]),
+          secondary: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: Colors.black54),
+                onPressed: () => _editTask(i),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () => _deleteTask(i),
+              ),
+            ],
+          ),
         );
       }).toList(),
     );
@@ -1045,11 +1749,18 @@ void _confirmRemoveMember(String email) {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7F50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             onPressed: () async {
               setState(() {
                 tasks[i] = TaskItem(
                   title: t.text.trim(),
-                  completed: tasks[i].completed,   // keep current status
+                  completed: tasks[i].completed, // keep current status
                 );
               });
 
@@ -1070,90 +1781,11 @@ void _confirmRemoveMember(String email) {
 
   // ================= COMMON =================
   Widget _empty(String t) => Padding(
-        padding: const EdgeInsets.all(30),
-        child: Text(t, style: TextStyle(color: Colors.grey.shade500)),
-      );
-
-  Widget _fab() => FloatingActionButton.extended(
-        backgroundColor: darkNavy,
-        foregroundColor: Colors.white,
-        onPressed: _showActions,
-        icon: const Icon(Icons.add),
-        label: const Text("Add Plan"),
-      );
-
-  void _showActions() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (s) => Column(mainAxisSize: MainAxisSize.min, children: [
-        const SizedBox(height: 12),
-        _action(Icons.map_outlined, "Add Itinerary", () => _addItinerary(s)),
-        _action(Icons.receipt, "Log Expense", () => _addExpense(s)),
-        _action(Icons.person_add, "Invite Member", () => _inviteMember(s)),
-        _action(Icons.checklist, "Add Checklist", () => _addChecklist(s)),
-        _action(Icons.task_alt, "Add Task", () => _addTask(s)),
-      ]),
-    );
-  }
-
-  ListTile _action(IconData i, String t, VoidCallback f) =>
-      ListTile(leading: Icon(i), title: Text(t), onTap: f);
+    padding: const EdgeInsets.all(30),
+    child: Text(t, style: TextStyle(color: Colors.grey.shade500)),
+  );
 
   // ================= ADD FORMS =================
-  void _addItinerary(BuildContext c) {
-    final t = TextEditingController();
-    final ti = TextEditingController();
-    final n = TextEditingController();
-
-    showDialog(
-        context: c,
-        builder: (_) => AlertDialog(
-              title: const Text("Add Itinerary"),
-              content: Column(mainAxisSize: MainAxisSize.min, children: [
-                TextField(controller: t, decoration: const InputDecoration(labelText: "Title")),
-                TextField(controller: ti, decoration: const InputDecoration(labelText: "Time")),
-                TextField(controller: n, decoration: const InputDecoration(labelText: "Note")),
-              ]),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(c), child: const Text("Cancel")),
-                ElevatedButton(
-                    onPressed: () async {
-                      setState(() => itinerary.add(ItineraryItem(title: t.text, time: ti.text, note: n.text)));
-                      await _saveToFirestore();
-                      Navigator.pop(c);
-                    },
-                    child: const Text("Save"))
-              ],
-            ));
-  }
-
-  void _addExpense(BuildContext c) {
-    final t = TextEditingController();
-    final a = TextEditingController();
-
-    showDialog(
-        context: c,
-        builder: (_) => AlertDialog(
-              title: const Text("Log Expense"),
-              content: Column(mainAxisSize: MainAxisSize.min, children: [
-                TextField(controller: t, decoration: const InputDecoration(labelText: "Title")),
-                TextField(controller: a, decoration: const InputDecoration(labelText: "Amount")),
-              ]),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(c), child: const Text("Cancel")),
-                ElevatedButton(
-                    onPressed: () async {
-                      setState(() => expenses.add(
-                          ExpenseItem(title: t.text, amount: double.tryParse(a.text) ?? 0)));
-                      await _saveToFirestore();
-                      Navigator.pop(c);
-                    },
-                    child: const Text("Save"))
-              ],
-            ));
-  }
 
   void _inviteMember(BuildContext ctx) {
     // ❗ Check if group is already full
@@ -1170,7 +1802,7 @@ void _confirmRemoveMember(String email) {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text("OK"),
-            )
+            ),
           ],
         ),
       );
@@ -1189,8 +1821,9 @@ void _confirmRemoveMember(String email) {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("Cancel")),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
 
           ElevatedButton(
             onPressed: () async {
@@ -1212,7 +1845,7 @@ void _confirmRemoveMember(String email) {
                       TextButton(
                         onPressed: () => Navigator.pop(context),
                         child: const Text("OK"),
-                      )
+                      ),
                     ],
                   ),
                 );
@@ -1239,41 +1872,147 @@ void _confirmRemoveMember(String email) {
     final t = TextEditingController();
 
     showDialog(
-        context: c,
-        builder: (_) => AlertDialog(
-              title: const Text("Add Checklist"),
-              content: TextField(controller: t),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(c), child: const Text("Cancel")),
-                ElevatedButton(
-                    onPressed: () async {
-                      setState(() => checklist.add(ChecklistItem(title: t.text)));
-                      await _saveToFirestore();
-                      Navigator.pop(c);
-                    },
-                    child: const Text("Save"))
-              ],
-            ));
+      context: c,
+      builder: (_) => AlertDialog(
+        title: const Text("Add Checklist"),
+        content: TextField(controller: t),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7F50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              if (t.text.trim().isNotEmpty) {
+                setState(() => checklist.add(ChecklistItem(title: t.text)));
+                await _saveToFirestore();
+              }
+              Navigator.pop(c);
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _addTask(BuildContext c) {
-    final t = TextEditingController();
+  // ================= TASKS =================
 
-    showDialog(
-        context: c,
-        builder: (_) => AlertDialog(
-              title: const Text("Add Task"),
-              content: TextField(controller: t),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(c), child: const Text("Cancel")),
-                ElevatedButton(
-                    onPressed: () async {
-                      setState(() => tasks.add(TaskItem(title: t.text)));
-                      await _saveToFirestore();
-                      Navigator.pop(c);
-                    },
-                    child: const Text("Save"))
-              ],
-            ));
+  // ================= BUDGET SETTINGS =================
+  void _showBudgetSettings(BuildContext context) {
+    final categories = [
+      'Food',
+      'Transport',
+      'Accommodation',
+      'Entertainment',
+      'Shopping',
+      'Other',
+    ];
+    final List<String> assignableMembers = ['Split Equally', ...members];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateSB) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20,
+                right: 20,
+                top: 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Cost Allocation",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Assign responsibility for expense categories. Unassigned categories are split equally.",
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  const SizedBox(height: 20),
+                  ...categories.map((cat) {
+                    String currentAssignment =
+                        widget.trip.categoryAssignments[cat] ?? 'Split Equally';
+                    if (!assignableMembers.contains(currentAssignment))
+                      currentAssignment = 'Split Equally';
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              cat,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          DropdownButton<String>(
+                            value: currentAssignment,
+                            items: assignableMembers.map((m) {
+                              return DropdownMenuItem(
+                                value: m,
+                                child: Text(
+                                  m == 'Split Equally'
+                                      ? m
+                                      : (m.length > 10
+                                            ? m.substring(0, 8) + "..."
+                                            : m),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) async {
+                              if (val == null) return;
+                              setStateSB(() {
+                                widget.trip.categoryAssignments[cat] = val;
+                              });
+                              setState(() {}); // Ensure parent updates
+                              await _saveToFirestore();
+                            },
+                            underline: Container(),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }
