@@ -88,6 +88,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     // Smart Recommendation: Long Weekend (Preserved Logic)
                     _buildSmartRecommendation(),
 
+                    const SizedBox(height: 24),
+
                     // Masonry Grid
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),

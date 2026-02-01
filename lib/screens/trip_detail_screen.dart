@@ -506,29 +506,77 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
   // ================= ITINERARY =================
   Widget _itinerary() {
+    // If no items at all, show empty state (optional, but maybe better to show the days even if empty?)
+    // Let's stick to: if no items, show empty, OR show days structure.
+    // User wants to see "Day 1", "Day 2".
+    // If list is empty, we can show "Day 1" with no items?
+    // Let's keep the _empty check if truly empty for now, or just remove it to always show days.
+    // Actually, if completely empty, the "Day 01" hardcode was previously shown? No, it showed empty state.
     if (itinerary.isEmpty) {
       return Column(
         children: [_empty("No itinerary items yet. Use the + button to add.")],
       );
     }
 
+    // Sort itinerary by day
+    itinerary.sort((a, b) {
+      if (a.day != b.day) return a.day.compareTo(b.day);
+      // specific time parsing is hard, so we just rely on day sort for now.
+      return 0;
+    });
+
+    // Group by Day
+    // We can loop through the total days of the trip to ensure order
+    int totalDays = widget.trip.days;
+    // Just in case totalDays is calculated weirdly or 0
+    if (totalDays < 1) totalDays = 1;
+
+    // Use a Set of days that have items to avoid showing 30 empty days?
+    // Or simpler: Iterate through the items and group them.
+    // But user might want to see "Day 2" to add to it? The add button is global.
+    // Let's iterate through unique days present in the itinerary for now, plus maybe Day 1 if effectively empty.
+    // Actually, distinct days from the list is safer.
+
+    // Get unique days from itinerary
+    final uniqueDays = itinerary.map((e) => e.day).toSet().toList()..sort();
+
+    // If we want to show consecutive days even if empty, we could.
+    // But let's stick to showing days that have items.
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Mock Day Header for visual separation
-          _dayHeader("01", "Arrival & Oasis"),
+          ...uniqueDays.map((day) {
+            final itemsForDay = itinerary.where((e) => e.day == day).toList();
+            // Determine date for this day
+            DateTime date = widget.trip.startDate.add(Duration(days: day - 1));
+            String dateStr = _formatDate(date); // e.g. OCT 5
 
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: itinerary.length,
-            itemBuilder: (context, index) {
-              final item = itinerary[index];
-              return _itineraryCard(item, index);
-            },
-          ),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _dayHeader(day.toString().padLeft(2, '0'), dateStr),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: itemsForDay.length,
+                  itemBuilder: (context, index) {
+                    // Find original index in main list to support edit/delete
+                    // Actually, edit/delete uses index of `itinerary`.
+                    // We need to pass the correct index or modify edit/delete to take the item or ID.
+                    // Since we don't have IDs, we need to find the index in the main list.
+                    final item = itemsForDay[index];
+                    final mainIndex = itinerary.indexOf(item);
+
+                    return _itineraryCard(item, mainIndex);
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            );
+          }).toList(),
 
           const SizedBox(height: 24),
         ],
@@ -958,6 +1006,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     final n = TextEditingController(text: itinerary[i].note);
     double? selectedLat = itinerary[i].lat;
     double? selectedLng = itinerary[i].lng;
+    int selectedDay = itinerary[i].day;
 
     showDialog(
       context: context,
@@ -968,6 +1017,21 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Day Dropdown
+                DropdownButtonFormField<int>(
+                  value: selectedDay,
+                  decoration: const InputDecoration(labelText: "Day"),
+                  items: List.generate(widget.trip.days, (index) {
+                    int day = index + 1;
+                    return DropdownMenuItem(
+                      value: day,
+                      child: Text("Day $day"),
+                    );
+                  }),
+                  onChanged: (val) {
+                    if (val != null) setStateSB(() => selectedDay = val);
+                  },
+                ),
                 TextField(
                   controller: t,
                   decoration: const InputDecoration(labelText: "Title"),
@@ -1086,6 +1150,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   note: n.text,
                   lat: selectedLat,
                   lng: selectedLng,
+                  day: selectedDay,
                 ),
               );
               await _saveToFirestore();
@@ -1188,6 +1253,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     final n = TextEditingController();
     double? selectedLat;
     double? selectedLng;
+    int selectedDay = 1;
 
     showDialog(
       context: context,
@@ -1198,6 +1264,21 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Day Dropdown
+                DropdownButtonFormField<int>(
+                  value: selectedDay,
+                  decoration: const InputDecoration(labelText: "Day"),
+                  items: List.generate(widget.trip.days, (index) {
+                    int day = index + 1;
+                    return DropdownMenuItem(
+                      value: day,
+                      child: Text("Day $day"),
+                    );
+                  }),
+                  onChanged: (val) {
+                    if (val != null) setStateSB(() => selectedDay = val);
+                  },
+                ),
                 TextField(
                   controller: t,
                   decoration: const InputDecoration(
@@ -1307,6 +1388,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                     note: n.text,
                     lat: selectedLat,
                     lng: selectedLng,
+                    day: selectedDay,
                   ),
                 ),
               );

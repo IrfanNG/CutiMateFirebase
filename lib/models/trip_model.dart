@@ -228,6 +228,7 @@ class ItineraryItem {
   final String note;
   final double? lat;
   final double? lng;
+  final int day; // Added day field
 
   ItineraryItem({
     required this.title,
@@ -235,6 +236,7 @@ class ItineraryItem {
     required this.note,
     this.lat,
     this.lng,
+    this.day = 1, // Default to Day 1
   });
 
   Map<String, dynamic> toMap() => {
@@ -243,6 +245,7 @@ class ItineraryItem {
     'note': note,
     'lat': lat,
     'lng': lng,
+    'day': day,
   };
 
   static ItineraryItem fromMap(Map<String, dynamic> map) => ItineraryItem(
@@ -251,6 +254,7 @@ class ItineraryItem {
     note: map['note'],
     lat: map['lat'],
     lng: map['lng'],
+    day: map['day'] ?? 1,
   );
 }
 
