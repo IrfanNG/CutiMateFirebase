@@ -5,7 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'edit_trip_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'destination_vote_screen.dart';
-import 'trip_map_tab.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import 'location_picker_screen.dart';
 import 'package:latlong2/latlong.dart';
 import '../widgets/curved_bottom_clipper.dart';
@@ -27,7 +28,6 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     'Group', // Renamed from Activities
     'Checklist',
     'Tasks',
-    'Map',
   ];
 
   final Color bgGray = const Color(0xFFFFFBF6);
@@ -497,8 +497,6 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         return _checklist();
       case 4:
         return _tasks();
-      case 5:
-        return SizedBox(height: 600, child: TripMapTab(itinerary: itinerary));
       default:
         return const SizedBox();
     }
@@ -943,6 +941,63 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                       fontSize: 14,
                       color: Colors.grey.shade600,
                       height: 1.5,
+                    ),
+                  ),
+                ],
+
+                if (item.lat != null && item.lng != null) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final lat = item.lat;
+                        final lng = item.lng;
+
+                        // 1. Try native map intent (geo:...)
+                        // This usually prompts selection (Maps, Waze, etc.)
+                        final Uri geoUrl = Uri.parse(
+                          "geo:$lat,$lng?q=$lat,$lng",
+                        );
+
+                        // 2. Fallback web URL
+                        final Uri webUrl = Uri.parse(
+                          "https://www.google.com/maps/search/?api=1&query=$lat,$lng",
+                        );
+
+                        try {
+                          if (await canLaunchUrl(geoUrl)) {
+                            await launchUrl(geoUrl);
+                          } else {
+                            // If native fails, try web link
+                            if (await canLaunchUrl(webUrl)) {
+                              await launchUrl(
+                                webUrl,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            } else {
+                              throw 'Could not launch maps';
+                            }
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Could not launch maps"),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.navigation, size: 18),
+                      label: const Text("Navigate (Map/Waze)"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF7F50),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
                 ],

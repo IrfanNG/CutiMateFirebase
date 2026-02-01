@@ -5,6 +5,7 @@ import 'groups_screen.dart';
 import 'profile_screen.dart';
 import 'create_trip_step1.dart';
 import 'trip_detail_screen.dart';
+import 'all_trips_screen.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -396,9 +397,17 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         final docs = snapshot.data!.docs;
-        final trips = docs
+        var trips = docs
             .map((d) => Trip.fromJson(d.id, d.data() as Map<String, dynamic>))
             .toList();
+
+        // Filter out past trips (keep trips ending today or in future)
+        final now = DateTime.now();
+        final todayStart = DateTime(now.year, now.month, now.day);
+
+        trips = trips.where((t) {
+          return !t.endDate.isBefore(todayStart);
+        }).toList();
 
         // Sort by start date
         trips.sort((a, b) => a.startDate.compareTo(b.startDate));
@@ -419,12 +428,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Color(0xFF1F2937),
                     ),
                   ),
-                  Text(
-                    "View all",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFFFF7F50),
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const AllTripsScreen(type: TripListType.upcoming),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      "View all",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFFF7F50),
+                      ),
                     ),
                   ),
                 ],
@@ -484,10 +504,14 @@ class _HomeScreenState extends State<HomeScreen> {
             .map((d) => Trip.fromJson(d.id, d.data() as Map<String, dynamic>))
             .toList();
 
-        // Filter OUT trips where I am the owner
-        // because "members" array usually includes the owner too if they auto-added themselves
-        // or just to be safe so we don't duplicate.
-        final trips = tripsData.where((t) => t.ownerUid != user.uid).toList();
+        // Filter OUT trips where I am the owner AND past trips
+        final now = DateTime.now();
+        final todayStart = DateTime(now.year, now.month, now.day);
+
+        final trips = tripsData.where((t) {
+          if (t.ownerUid == user.uid) return false;
+          return !t.endDate.isBefore(todayStart);
+        }).toList();
 
         // Sort by start date
         trips.sort((a, b) => a.startDate.compareTo(b.startDate));
@@ -508,12 +532,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Color(0xFF1F2937),
                     ),
                   ),
-                  Text(
-                    "View all",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFFFF7F50),
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const AllTripsScreen(type: TripListType.shared),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      "View all",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFFF7F50),
+                      ),
                     ),
                   ),
                 ],
@@ -548,21 +583,16 @@ class _HomeScreenState extends State<HomeScreen> {
   // HELPER: Empty State Text
   // ===============================================================
   Widget _buildEmptyNotification(String message) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Center(
         child: Text(
           message,
           style: TextStyle(
             color: Colors.grey.shade400,
             fontWeight: FontWeight.w500,
+            fontSize: 14,
+            fontStyle: FontStyle.italic,
           ),
         ),
       ),
