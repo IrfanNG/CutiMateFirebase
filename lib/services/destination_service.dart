@@ -170,6 +170,124 @@ class DestinationService {
     }
   }
 
+  /// Get Similar Destinations based on a seed (e.g. derived from Trip Destination)
+  /// Get Similar Destinations based on a seed (e.g. derived from Trip Destination)
+  static Future<List<Destination>> getSimilarDestinations(
+    String seedName,
+  ) async {
+    // 1. Try Local Match First
+    try {
+      final localMatch = allDestinations.firstWhere(
+        (d) => d.name.toLowerCase() == seedName.toLowerCase(),
+      );
+
+      // Found locally! Return others of same category
+      final similar = allDestinations
+          .where((d) => d.category == localMatch.category && d.name != seedName)
+          .toList();
+
+      if (similar.isNotEmpty) {
+        return [localMatch, ...similar].take(5).toList();
+      }
+    } catch (_) {
+      // Not found locally
+    }
+
+    // 2. Keyword-Based API Search (More Specific)
+    // normalize for checking
+    final lowerSeed = seedName.toLowerCase();
+    String searchQuery = "Tourist attractions in Malaysia"; // default
+
+    if (lowerSeed.contains('pulau') || lowerSeed.contains('island')) {
+      searchQuery = "Islands and beaches in Malaysia";
+    } else if (lowerSeed.contains('mountain') ||
+        lowerSeed.contains('gunung') ||
+        lowerSeed.contains('bukit') ||
+        lowerSeed.contains('hill') ||
+        lowerSeed.contains('peak')) {
+      searchQuery = "Mountains and hiking trails in Malaysia";
+    } else if (lowerSeed.contains('mall') ||
+        lowerSeed.contains('plaza') ||
+        lowerSeed.contains('complex') ||
+        lowerSeed.contains('shopping')) {
+      searchQuery = "Shopping malls in Malaysia";
+    } else if (lowerSeed.contains('waterfall') ||
+        lowerSeed.contains('air terjun')) {
+      searchQuery = "Waterfalls in Malaysia";
+    } else if (lowerSeed.contains('theme park') ||
+        lowerSeed.contains('resort') ||
+        lowerSeed.contains('amusement') ||
+        lowerSeed.contains('subway') || // legoland, sunway, etc
+        lowerSeed.contains('lagoon')) {
+      searchQuery = "Theme parks and resorts in Malaysia";
+    } else if (lowerSeed.contains('museum') || lowerSeed.contains('muzium')) {
+      searchQuery = "Museums and galleries in Malaysia";
+    } else if (lowerSeed.contains('temple') ||
+        lowerSeed.contains('mosque') ||
+        lowerSeed.contains('church')) {
+      searchQuery = "Religious sites in Malaysia";
+    } else {
+      // 3. Fallback: API Category Match (General)
+      try {
+        final seedResults = await searchDestinations(seedName);
+        if (seedResults.isNotEmpty) {
+          final seed = seedResults.first;
+          // Use category to broaden search
+          if (seed.category == 'Beach')
+            searchQuery = "Islands and beaches Malaysia";
+          else if (seed.category == 'Nature')
+            searchQuery = "Nature parks Malaysia";
+          else if (seed.category == 'Adventure')
+            searchQuery = "Adventure activities Malaysia";
+          else if (seed.category == 'City')
+            searchQuery = "Cities in Malaysia";
+          else if (seed.category == 'Culture')
+            searchQuery = "Cultural sites Malaysia";
+        }
+      } catch (e) {
+        // failed to get details, stick to default
+      }
+    }
+
+    try {
+      final similarResults = await searchDestinations(searchQuery);
+
+      // Filter out exact name match if any (case insensitive)
+      final filtered = similarResults
+          .where(
+            (d) =>
+                !d.name.toLowerCase().contains(
+                  lowerSeed,
+                ) && // Avoid "Pulau X" matching "Pulau X Resort" if similar
+                d.name.toLowerCase() != lowerSeed,
+          )
+          .toList();
+
+      // Return results (try to include seed if we can fetch it, but searchDestinations returns a list)
+      // Actually we don't have the 'seed' object ready-made unless we search for it.
+      // But for "Similar Destinations", user likely sees the seed as the current plan.
+      // We should return just the suggestions.
+      // BUT `DestinationVoteScreen` expects options. If we want the current plan to be an option, we must fetch it.
+
+      // Let's ensure we have the "Current Plan" (Seed) as the first option.
+      Destination? seedObj;
+      try {
+        final seedFetch = await searchDestinations(seedName);
+        if (seedFetch.isNotEmpty) seedObj = seedFetch.first;
+      } catch (_) {}
+
+      final List<Destination> finalReturn = [];
+      if (seedObj != null) finalReturn.add(seedObj);
+
+      finalReturn.addAll(filtered);
+
+      return finalReturn.take(5).toList();
+    } catch (e) {
+      print("Error finding similar: $e");
+      return getPopularDestinations();
+    }
+  }
+
   /// Construct the Photo URL from the photo resource name
   static String _buildPhotoUrl(String photoName) {
     // maxSizeBytes helps limit data usage. 400px wide is good for thumbnails/cards.

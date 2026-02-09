@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../data/destinations_data.dart';
+
+import '../services/destination_service.dart'; // Added import
 
 /// ===============================================================
 /// DESTINATION VOTE SCREEN (SOCIAL UX)
@@ -22,7 +23,7 @@ class DestinationVoteScreen extends StatefulWidget {
 
 class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
   final user = FirebaseAuth.instance.currentUser!;
-  bool pollFixed = false;
+  // pollFixed removed as it was for static data sync
 
   // Colors
   final Color primaryOrange = const Color(0xFFFF7F50); // Coral Orange
@@ -37,24 +38,45 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
 
   /// Create fresh poll if none exists
   Future<void> _createFreshPoll() async {
-    final List<Map<String, dynamic>> options = destinations.map((d) {
-      return {
-        "name": d.name,
-        "image": d.image,
-        "votes": [], // list of user IDs
-      };
-    }).toList();
+    try {
+      // 1. Fetch Trip Data to get current destination
+      final tripSnap = await FirebaseFirestore.instance
+          .collection('trips')
+          .doc(widget.tripId)
+          .get();
 
-    await FirebaseFirestore.instance
-        .collection("trips")
-        .doc(widget.tripId)
-        .collection("votes")
-        .doc("destinationPoll")
-        .set({
-          "question": "Where should we go?",
-          "isClosed": false,
-          "options": options,
-        });
+      if (!tripSnap.exists) return;
+      final tripData = tripSnap.data()!;
+      final String currentDestination = tripData['destination'] ?? 'Malaysia';
+
+      // 2. Fetch Similar Destinations
+      // This will return [original, similar1, similar2, ...]
+      final candidates = await DestinationService.getSimilarDestinations(
+        currentDestination,
+      );
+
+      // 3. Create Options
+      final List<Map<String, dynamic>> options = candidates.map((d) {
+        return {
+          "name": d.name,
+          "image": d.image,
+          "votes": [], // list of user IDs
+        };
+      }).toList();
+
+      await FirebaseFirestore.instance
+          .collection("trips")
+          .doc(widget.tripId)
+          .collection("votes")
+          .doc("destinationPoll")
+          .set({
+            "question": "Which destination is best?",
+            "isClosed": false,
+            "options": options,
+          });
+    } catch (e) {
+      debugPrint("Error creating poll: $e");
+    }
   }
 
   /// Toggle Vote: If already voted for this, remove. If not, add (and remove from others).
@@ -170,13 +192,6 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
 
               final pollData = pollSnap.data!.data() as Map<String, dynamic>;
               final List options = List.from(pollData["options"]);
-
-              // FIX: Ensure options match current static list size (simple sync fix)
-              if (!pollFixed && options.length != destinations.length) {
-                pollFixed = true;
-                _createFreshPoll(); // dangerous reset if live, but safe for dev prototype
-                return const Center(child: CircularProgressIndicator());
-              }
 
               // CALCULATE STATS
               final allVotes = <String>{}; // unique user IDs who voted
@@ -297,12 +312,27 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
           ),
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              option["image"],
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-            ),
+            child: option["image"].startsWith('http')
+                ? Image.network(
+                    option["image"],
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 50,
+                        height: 50,
+                        color: Colors.grey.shade300,
+                        child: const Icon(Icons.broken_image, size: 20),
+                      );
+                    },
+                  )
+                : Image.asset(
+                    option["image"],
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                  ),
           ),
         ],
       ),
@@ -421,12 +451,27 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
             // Image
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                option["image"],
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-              ),
+              child: option["image"].startsWith('http')
+                  ? Image.network(
+                      option["image"],
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.grey.shade300,
+                          child: const Icon(Icons.broken_image, size: 24),
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      option["image"],
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                    ),
             ),
             const SizedBox(width: 16),
 
