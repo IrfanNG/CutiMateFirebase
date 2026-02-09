@@ -180,7 +180,9 @@ class _GroupsScreenState extends State<GroupsScreen> {
   // ===============================================================
   Widget _groupCard(Trip trip) {
     // Helper to get image based on destination
-    String imageUrl = _getImageForDestination(trip.destination);
+    String imageUrl = (trip.imageUrl != null && trip.imageUrl!.isNotEmpty)
+        ? trip.imageUrl!
+        : _getImageForDestination(trip.destination);
 
     return GestureDetector(
       onTap: () {

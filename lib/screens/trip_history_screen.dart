@@ -144,16 +144,26 @@ class TripHistoryScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF7F50).withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.flag_rounded,
-                          size: 20,
-                          color: Color(0xFFFF7F50),
+                      // Destination Image Thumbnail
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          (trip.imageUrl != null && trip.imageUrl!.isNotEmpty)
+                              ? trip.imageUrl!
+                              : 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=1000', // Fallback
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey.shade200,
+                            child: Icon(
+                              Icons.broken_image,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),

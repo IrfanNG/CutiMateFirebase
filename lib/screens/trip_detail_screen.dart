@@ -335,9 +335,17 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             ClipPath(
               clipper: CurvedBottomClipper(),
               child: Image.network(
-                // Use a destination image based on trip destination if possible, else placeholder
-                _getImageForDestination(widget.trip.destination),
+                (widget.trip.imageUrl != null &&
+                        widget.trip.imageUrl!.isNotEmpty)
+                    ? widget.trip.imageUrl!
+                    : _getImageForDestination(widget.trip.destination),
                 fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: Colors.grey.shade300,
+                  child: const Center(
+                    child: Icon(Icons.image_not_supported, color: Colors.grey),
+                  ),
+                ),
               ),
             ),
             // Gradient
@@ -672,7 +680,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 builder: (_) => TripChatScreen(trip: widget.trip),
               ),
             ),
-            color: Colors.deepPurple,
+            color: const Color(0xFFFF7F50),
           ),
           const SizedBox(height: 12),
 
@@ -697,7 +705,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               "Invite New Member",
               Icons.person_add_alt_1_outlined,
               () => _inviteMember(context),
-              color: Colors.teal,
+              color: const Color(0xFFFF7F50),
             ),
 
           // Leave
@@ -751,7 +759,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          alignment: Alignment.centerLeft,
+          alignment: Alignment.center,
         ),
         onPressed: onPressed,
         icon: Icon(icon, size: 22),

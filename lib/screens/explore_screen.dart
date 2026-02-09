@@ -12,7 +12,8 @@ import '../services/destination_service.dart';
 /// UI Redesigned to match "Explore World" mockup (Masonry Layout).
 /// ===============================================================
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  final VoidCallback? onBack;
+  const ExploreScreen({super.key, this.onBack});
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -167,7 +168,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
         children: [
           // Back Button (Circle)
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              if (widget.onBack != null) {
+                widget.onBack!();
+              } else {
+                Navigator.pop(context);
+              }
+            },
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -230,31 +237,64 @@ class _ExploreScreenState extends State<ExploreScreen> {
       ),
       child: Autocomplete<Destination>(
         optionsBuilder: (TextEditingValue textEditingValue) async {
-          // Keep existing logic
           final query = textEditingValue.text;
           if (query.isEmpty) return const Iterable<Destination>.empty();
 
+          // 1. Local Search (Instant)
           final localMatches = _allKnownDestinations.where((option) {
             return option.name.toLowerCase().contains(query.toLowerCase()) ||
                 option.state.toLowerCase().contains(query.toLowerCase());
           }).toList();
+
+          // 2. API Search (Network) - Only if length > 2
+          if (query.length > 2) {
+            try {
+              final apiMatches = await DestinationService.searchDestinations(
+                query,
+              );
+
+              // Merge without duplicates (prefer local matches)
+              for (var apiDest in apiMatches) {
+                if (!localMatches.any((l) => l.name == apiDest.name)) {
+                  localMatches.add(apiDest);
+                }
+              }
+            } catch (e) {
+              debugPrint("Search Error: $e");
+            }
+          }
+
           return localMatches;
         },
         displayStringForOption: (Destination option) => option.name,
         onSelected: (Destination selection) {
-          // Navigate to detail page on selection
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => DestinationDetailScreen(destination: selection),
-            ),
-          );
+          // Instead of navigating, we update the grid to show this selection
+          // Or we could navigate. But user said "show the destination on the list".
+          // Typically "search bar... show on the list" means filtering.
+          // Let's set the main list to just this item or similar items.
+          setState(() {
+            _destinationsFuture = Future.value([selection]);
+          });
         },
         fieldViewBuilder: (context, controller, focusNode, onComplete) {
           return TextField(
             controller: controller,
             focusNode: focusNode,
+            onSubmitted: (value) {
+              // Trigger full search on submit
+              if (value.isNotEmpty) {
+                setState(() {
+                  _destinationsFuture = DestinationService.searchDestinations(
+                    value,
+                  );
+                });
+              }
+            },
             onChanged: (value) {
+              // Optional: Live search?
+              // We might not want to spam API.
+              // Let's stick to Autocomplete suggestions updating, and "Submit" or "Select" updating the grid.
+              // But for local filtering, we can still use _searchKeyword.
               setState(() {
                 _searchKeyword = value;
               });
@@ -263,16 +303,82 @@ class _ExploreScreenState extends State<ExploreScreen> {
               hintText: "Search destinations, activities...",
               hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
               prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-              suffixIcon: Icon(
-                Icons.tune,
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.tune),
                 color: const Color(0xFFFFC107),
-              ), // Filter icon
+                onPressed: () {
+                  // Filter logic if needed
+                },
+              ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 14),
             ),
           );
         },
-        // Reusing the option view builder from before could be good, but standard is fine for now
+        optionsViewBuilder: (context, onSelected, options) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: MediaQuery.of(context).size.width - 40, // Adjust width
+                constraints: const BoxConstraints(maxHeight: 250),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final Destination option = options.elementAt(index);
+                    return ListTile(
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: option.image.startsWith('http')
+                            ? Image.network(
+                                option.image,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 40,
+                                  height: 40,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(
+                                    Icons.image_not_supported,
+                                    size: 20,
+                                  ),
+                                ),
+                              )
+                            : Image.asset(
+                                option.image,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                              ),
+                      ),
+                      title: Text(
+                        option.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: Text(
+                        option.state,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      onTap: () => onSelected(option),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

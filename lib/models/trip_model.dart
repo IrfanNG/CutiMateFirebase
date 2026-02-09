@@ -11,6 +11,7 @@ class Trip {
   String transport;
   String accommodation;
   double budget;
+  String? imageUrl; // New field for persisting destination image
 
   final List<String> activities;
 
@@ -40,6 +41,7 @@ class Trip {
     required this.transport,
     required this.accommodation,
     required this.budget,
+    this.imageUrl,
     required this.activities,
     required this.groupName,
     required this.members,
@@ -67,6 +69,7 @@ class Trip {
     String? transport,
     String? accommodation,
     double? budget,
+    String? imageUrl,
     List<String>? activities,
     List<ItineraryItem>? itinerary,
     List<ExpenseItem>? expenses,
@@ -89,6 +92,7 @@ class Trip {
       transport: transport ?? this.transport,
       accommodation: accommodation ?? this.accommodation,
       budget: budget ?? this.budget,
+      imageUrl: imageUrl ?? this.imageUrl,
       activities: activities ?? this.activities,
       itinerary: itinerary ?? this.itinerary,
       expenses: expenses ?? this.expenses,
@@ -114,6 +118,7 @@ class Trip {
       'transport': transport,
       'accommodation': accommodation,
       'budget': budget,
+      'imageUrl': imageUrl,
       'activities': activities,
 
       'itinerary': itinerary.map((e) => e.toMap()).toList(),
@@ -149,6 +154,7 @@ class Trip {
       transport: json['transport'] ?? '',
       accommodation: json['accommodation'] ?? '',
       budget: (json['budget'] ?? 0).toDouble(),
+      imageUrl: json['imageUrl'],
       activities: List<String>.from(json['activities'] ?? []),
 
       itinerary: (json['itinerary'] as List<dynamic>? ?? [])

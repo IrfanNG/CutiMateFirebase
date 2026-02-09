@@ -12,8 +12,13 @@ import '../services/destination_service.dart';
 class CreateTripStep1 extends StatefulWidget {
   final String?
   presetDestination; // Optional preset destination (e.g. clicked from Explore)
+  final Destination? presetDestinationObj; // Optional full object
 
-  const CreateTripStep1({super.key, this.presetDestination});
+  const CreateTripStep1({
+    super.key,
+    this.presetDestination,
+    this.presetDestinationObj,
+  });
 
   @override
   State<CreateTripStep1> createState() => _CreateTripStep1State();
@@ -22,6 +27,9 @@ class CreateTripStep1 extends StatefulWidget {
 class _CreateTripStep1State extends State<CreateTripStep1> {
   /// Controller for destination text input
   final TextEditingController destinationController = TextEditingController();
+
+  /// Selected destination object
+  Destination? _selectedDestination;
 
   /// Selected trip start + end dates
   DateTime? startDate;
@@ -35,8 +43,23 @@ class _CreateTripStep1State extends State<CreateTripStep1> {
   @override
   void initState() {
     super.initState();
-    if (widget.presetDestination != null) {
+
+    // Priority 1: Full Object passed (e.g. from DestinationDetailScreen)
+    if (widget.presetDestinationObj != null) {
+      _selectedDestination = widget.presetDestinationObj;
+      destinationController.text = widget.presetDestinationObj!.name;
+    }
+    // Priority 2: String passed (legacy/fallback)
+    else if (widget.presetDestination != null) {
       destinationController.text = widget.presetDestination!;
+      // Attempt to find the preset destination object in local data
+      try {
+        _selectedDestination = allDestinations.firstWhere(
+          (d) => d.name == widget.presetDestination,
+        );
+      } catch (_) {
+        // Preset string doesn't match any known destination
+      }
     }
   }
 
@@ -191,7 +214,10 @@ class _CreateTripStep1State extends State<CreateTripStep1> {
                       displayStringForOption: (Destination option) =>
                           option.name,
                       onSelected: (Destination selection) {
-                        destinationController.text = selection.name;
+                        setState(() {
+                          _selectedDestination = selection;
+                          destinationController.text = selection.name;
+                        });
                       },
                       fieldViewBuilder:
                           (
@@ -467,7 +493,7 @@ class _CreateTripStep1State extends State<CreateTripStep1> {
 
       child: ElevatedButton(
         /// Validate Inputs Before Moving to Step 2
-        onPressed: () {
+        onPressed: () async {
           if (destinationController.text.isEmpty ||
               startDate == null ||
               endDate == null) {
@@ -479,17 +505,59 @@ class _CreateTripStep1State extends State<CreateTripStep1> {
             return;
           }
 
-          /// Move to Step 2, passing collected data
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CreateTripStep2(
-                destination: destinationController.text,
-                startDate: startDate!,
-                endDate: endDate!,
-              ),
-            ),
+          Destination? finalDest = _selectedDestination;
+
+          // If no destination selected from list (manual entry), try to fetch it
+          if (finalDest == null) {
+            // Show simple loading feedback
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Verifying destination...')),
+            );
+
+            try {
+              final results = await DestinationService.searchDestinations(
+                destinationController.text.trim(),
+              );
+              if (results.isNotEmpty) {
+                finalDest = results.first;
+              }
+            } catch (e) {
+              debugPrint("Error fetching manual destination: $e");
+            }
+          }
+
+          // Fallback if still null
+          finalDest ??= Destination(
+            name: destinationController.text,
+            state: 'Unknown',
+            category: 'Custom',
+            image: 'assets/penang.jpg', // Fallback
+            rating: 0.0,
+            bestTime: '',
+            avgCost: '',
+            duration: '',
+            about: '',
+            highlights: [],
+            childFriendly: true,
+            elderFriendly: true,
+            physicalDemand: 'Low',
+            terrainType: 'Flat',
           );
+
+          /// Move to Step 2, passing collected data
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar(); // Hide loading
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateTripStep2(
+                  destination: finalDest!,
+                  startDate: startDate!,
+                  endDate: endDate!,
+                ),
+              ),
+            );
+          }
         },
 
         /// Button style

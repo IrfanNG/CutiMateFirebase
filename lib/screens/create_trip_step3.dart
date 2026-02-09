@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/trip_model.dart';
+import '../models/destination_model.dart'; // Import Destination Model
 import 'home_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/trip_service.dart';
@@ -10,7 +11,7 @@ import '../services/trip_service.dart';
 /// This screen completes the trip creation process.
 /// =======================================================
 class CreateTripStep3 extends StatefulWidget {
-  final String destination; // Destination chosen in Step 1
+  final Destination destination; // Destination chosen in Step 1
   final DateTime startDate; // Trip start date
   final DateTime endDate; // Trip end date
   final int travelers; // Number of travelers
@@ -153,7 +154,11 @@ class _CreateTripStep3State extends State<CreateTripStep3> {
       /// Content Rows
       child: Column(
         children: [
-          _row(Icons.location_on_outlined, 'Destination', widget.destination),
+          _row(
+            Icons.location_on_outlined,
+            'Destination',
+            widget.destination.name,
+          ),
           _divider(),
 
           _row(
@@ -330,18 +335,18 @@ class _CreateTripStep3State extends State<CreateTripStep3> {
     /// Check if trip is group trip or solo
     final bool isGroupTrip = widget.travelers > 1;
 
-    /// Create Trip object
     final trip = Trip(
       id: '',
       ownerUid: user.uid,
-      title: widget.destination,
-      destination: widget.destination,
+      title: widget.destination.name,
+      destination: widget.destination.name,
       startDate: widget.startDate,
       endDate: widget.endDate,
       travelers: widget.travelers,
       transport: widget.transport,
       accommodation: widget.accommodation,
       budget: double.tryParse(budgetController.text) ?? 0,
+      imageUrl: widget.destination.image, // Use destination image
       activities: widget.activities,
 
       /// Empty lists initially
@@ -353,7 +358,7 @@ class _CreateTripStep3State extends State<CreateTripStep3> {
 
       /// Group-related settings
       isGroup: isGroupTrip,
-      groupName: isGroupTrip ? "${widget.destination} Trip Group" : '',
+      groupName: isGroupTrip ? "${widget.destination.name} Trip Group" : '',
       members: [user.email ?? 'Unknown'],
     );
 

@@ -4,57 +4,65 @@ import '../models/destination_model.dart';
 import '../data/destination_data.dart';
 
 class DestinationService {
-  /// Nominatim OpenStreetMap API endpoint
-  static const String _baseUrl = 'https://nominatim.openstreetmap.org/search';
+  /// Google Places API Key (Provided by User)
+  static const String _apiKey = 'AIzaSyBMR8dB2Ch_gv01CBc8LK_thf9_fqwAP9I';
 
-  /// Fetch destinations from API based on query
-  static Future<List<Destination>> searchDestinations(
-    String query, {
-    int limit = 20,
-  }) async {
+  /// Google Places (New) Text Search Endpoint
+  static const String _placesUrl =
+      'https://places.googleapis.com/v1/places:searchText';
+
+  /// Google Places Photo Base URL (for constructing image links)
+  static const String _photoBaseUrl = 'https://places.googleapis.com/v1';
+
+  /// Fetch destinations from Google Places API based on query
+  static Future<List<Destination>> searchDestinations(String query) async {
     if (query.length < 2) return [];
 
     try {
-      final url = Uri.parse(
-        '$_baseUrl?q=$query&countrycodes=my&format=json&addressdetails=1&extratags=1&limit=$limit',
-      );
-
-      // User-Agent is required by Nominatim policy
-      final response = await http.get(
-        url,
-        headers: {'User-Agent': 'CutiMateApp/1.0'},
+      final response = await http.post(
+        Uri.parse(_placesUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': _apiKey,
+          'X-Goog-FieldMask':
+              'places.id,places.displayName,places.formattedAddress,places.types,places.photos',
+        },
+        body: jsonEncode({
+          'textQuery': query,
+          'languageCode': 'en', // Optional: prioritize English results
+        }),
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
+        final data = json.decode(response.body);
+        final List<dynamic> places = data['places'] ?? [];
 
-        // Process results in parallel to speed up Wiki fetches
-        final futures = data.map((jsonItem) async {
-          Destination apiDest = _mapJsonToDestination(jsonItem);
+        List<Destination> results = [];
 
-          // Hybrid Logic: Check for Curated Match FIRST
+        for (var place in places) {
+          // 1. Check if this place exists in our Curated Data (Hybrid Logic)
+          // We match by name loosely to prefer our high-quality data
+          final String name = place['displayName']['text'];
+
           try {
             final curatedMatch = allDestinations.firstWhere(
-              (d) =>
-                  d.name.toLowerCase() == apiDest.name.toLowerCase() ||
-                  d.name.toLowerCase().contains(apiDest.name.toLowerCase()) ||
-                  apiDest.name.toLowerCase().contains(d.name.toLowerCase()),
+              (d) => d.name.toLowerCase() == name.toLowerCase(),
             );
-            return curatedMatch;
+            results.add(curatedMatch);
+            continue; // Skip API processing for this item
           } catch (_) {
-            // Not curated. Fetch Wiki image!
-            final wikiImage = await _fetchWikiImage(apiDest.name);
-            // Remap with the new image
-            return _mapJsonToDestination(jsonItem, imageUrl: wikiImage);
+            // Not in curated list, proceed to map from API
           }
-        });
 
-        final results = await Future.wait(futures);
+          // 2. Map Google Place to Destination
+          results.add(_mapGooglePlaceToDestination(place));
+        }
 
-        // Dedup
-        final uniqueMap = {for (var d in results) d.name: d};
-        return uniqueMap.values.toList();
+        return results;
       } else {
+        print(
+          'Google Places API Error: ${response.statusCode} - ${response.body}',
+        );
         return [];
       }
     } catch (e) {
@@ -63,123 +71,281 @@ class DestinationService {
     }
   }
 
-  /// Fetch initial list for Explore Screen
-  /// Queries multiple diverse categories to build a rich "feed" of destinations
-  /// Fetch initial list for Explore Screen
-  /// Returns trusted curated destinations
+  /// Get Popular Destinations (Fetches from API)
   static Future<List<Destination>> getPopularDestinations() async {
-    // Return curated list (simulating async)
-    await Future.delayed(const Duration(milliseconds: 300));
-    return allDestinations;
-  }
+    // Track unique IDs to prevent duplicates
+    final Set<String> existingIds = {};
+    final List<Destination> finalResults = [];
 
-  static Future<String?> _fetchWikiImage(String query) async {
+    // Helper to process and add places
+    void processPlaces(List<dynamic> places) {
+      for (var place in places) {
+        // Skip if no photos (User wants original images)
+        if (place['photos'] == null || (place['photos'] as List).isEmpty) {
+          continue;
+        }
+
+        final d = _mapGooglePlaceToDestination(place);
+
+        // Skip if duplicate ID or Name (for robustness)
+        if (existingIds.contains(d.placeId)) continue;
+        if (finalResults.any((e) => e.name == d.name)) continue;
+
+        existingIds.add(d.placeId!);
+        finalResults.add(d);
+      }
+    }
+
     try {
-      final url = Uri.parse(
-        'https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=thumbnail&pithumbsize=600&titles=$query',
+      // 1. First Batch: Top Tourist Attractions
+      final response = await http.post(
+        Uri.parse(_placesUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': _apiKey,
+          'X-Goog-FieldMask':
+              'places.id,places.displayName,places.formattedAddress,places.types,places.photos,places.editorialSummary',
+        },
+        body: jsonEncode({
+          'textQuery': "Tourist attractions in Malaysia",
+          'languageCode': 'en',
+          'pageSize': 20,
+        }),
       );
-      final response = await http.get(url);
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final pages = data['query']['pages'];
-        if (pages != null) {
-          final firstPageId = pages.keys.first;
-          if (firstPageId != "-1") {
-            final thumbnail = pages[firstPageId]['thumbnail'];
-            if (thumbnail != null) {
-              return thumbnail['source'];
-            }
-          }
+        processPlaces(data['places'] ?? []);
+      }
+
+      // 2. Second Batch: Islands & Beaches (to ensure variety and count)
+      if (finalResults.length < 25) {
+        final response2 = await http.post(
+          Uri.parse(_placesUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': _apiKey,
+            'X-Goog-FieldMask':
+                'places.id,places.displayName,places.formattedAddress,places.types,places.photos,places.editorialSummary',
+          },
+          body: jsonEncode({
+            'textQuery': "Islands and beaches in Malaysia",
+            'languageCode': 'en',
+            'pageSize': 15, // Ask for slightly more
+          }),
+        );
+
+        if (response2.statusCode == 200) {
+          final data2 = json.decode(response2.body);
+          processPlaces(data2['places'] ?? []);
         }
       }
+
+      // 3. Third Batch (Optional Backup): Hidden Gems / Nature if still low
+      if (finalResults.length < 20) {
+        final response3 = await http.post(
+          Uri.parse(_placesUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': _apiKey,
+            'X-Goog-FieldMask':
+                'places.id,places.displayName,places.formattedAddress,places.types,places.photos,places.editorialSummary',
+          },
+          body: jsonEncode({
+            'textQuery': "Nature parks in Malaysia",
+            'languageCode': 'en',
+            'pageSize': 10,
+          }),
+        );
+        if (response3.statusCode == 200) {
+          final data3 = json.decode(response3.body);
+          processPlaces(data3['places'] ?? []);
+        }
+      }
+
+      return finalResults;
     } catch (e) {
-      print("Wiki Image Error: $e");
+      print("API Error: $e");
+      return allDestinations; // Fallback only on critical error
     }
-    return null;
   }
 
-  /// Convert Nominatim JSON to our App's Destination Model
-  /// + "AI" Enrichment (Heuristic Logic)
-  static Destination _mapJsonToDestination(
-    Map<String, dynamic> json, {
-    String? imageUrl,
-  }) {
-    // 1. Extract Basic Info
-    String name = json['display_name'].split(',')[0]; // Simple name
-    String fullState = json['address']['state'] ?? 'Malaysia';
+  /// Construct the Photo URL from the photo resource name
+  static String _buildPhotoUrl(String photoName) {
+    // maxSizeBytes helps limit data usage. 400px wide is good for thumbnails/cards.
+    return '$_photoBaseUrl/$photoName/media?key=$_apiKey&maxHeightPx=400&maxWidthPx=400';
+  }
 
-    // 2. Identify Type for Heuristics
-    String type =
-        json['type'] ?? 'unknown'; // e.g., 'city', 'island', 'attraction'
-    String category = json['class'] ?? 'place'; // e.g., 'natural', 'amenity'
+  /// Map Google Place JSON to Destination Model
+  static Destination _mapGooglePlaceToDestination(Map<String, dynamic> place) {
+    // 1. Basic Info
+    final String name = place['displayName']['text'] ?? 'Unknown Place';
+    final String address = place['formattedAddress'] ?? 'Malaysia';
+    final String id = place['id'];
 
-    // 3. Smart Profile Enrichment (The "AI" Part)
+    // Extract State from address (Simple heuristic: look for last comma part or known states)
+    // E.g. "123 Jalan, Subang Jaya, Selangor, Malaysia" -> "Selangor"
+    // For now, we'll just use the full address or a truncated version
+    String state = address;
+    final parts = address.split(',');
+    if (parts.length > 2) {
+      state = parts[parts.length - 2].trim(); // heuristics
+    }
+
+    // 2. Types & Heuristics
+    final List<dynamic> types = place['types'] ?? [];
+
     // Default values
+    String category = 'City';
     bool childFriendly = true;
     bool elderFriendly = true;
     String physicalDemand = 'Low';
     String terrainType = 'Flat';
-    String appCategory = 'City';
+    List<String> tags = ['New Discovery'];
 
-    // Heuristic Rules
-    if (category == 'natural') {
-      appCategory = 'Nature';
-      if (type == 'peak' || type == 'volcano' || type == 'mountain_range') {
-        appCategory = 'Adventure';
+    // Generated Info Lists
+    List<String> attractions = ['Main Area', 'Local Shops', 'Photo Spots'];
+    List<String> activities = ['Sightseeing', 'Relaxing', 'Photography'];
+    List<String> tips = [
+      'Check opening hours',
+      'Bring a camera',
+      'Stay hydrated',
+    ];
+
+    // Heuristic Rules based on Google Place Types
+    if (types.contains('beach') || types.contains('island')) {
+      category = 'Beach';
+      terrainType = 'Sandy';
+      elderFriendly = false; // Sandy terrain usually hard for elderly
+      tags.add('Beach');
+      attractions = ['Sandy Shore', 'Sunset Viewpoint', 'Local Stalls'];
+      activities = ['Swimming', 'Sunbathing', 'Picnic', 'Sandcastle Building'];
+      tips = [
+        'Bring sunscreen',
+        'Visiting at sunset is recommended',
+        'Watch for tide changes',
+      ];
+    } else if (types.contains('national_park') ||
+        types.contains('park') ||
+        types.contains('campground') ||
+        types.contains('natural_feature')) {
+      category = 'Nature';
+      terrainType = 'Mixed';
+      attractions = ['Walking Trails', 'Nature Center', 'Scenic Overlooks'];
+      activities = ['Walking', 'Bird Watching', 'Picnicking'];
+      tips = [
+        'Bring insect repellent',
+        'Wear comfortable shoes',
+        'Keep the park clean',
+      ];
+
+      if (types.contains('mountain') || types.contains('hiking_area')) {
+        category = 'Adventure';
         physicalDemand = 'High';
-        terrainType = 'Steep';
         childFriendly = false;
         elderFriendly = false;
-      } else if (type == 'beach' || type == 'coastline') {
-        appCategory = 'Beach';
-        terrainType = 'Sandy';
-        // Beaches are generally mixed for accessibility
-        elderFriendly = false;
-      } else if (type == 'water' || type == 'bay') {
-        appCategory = 'Nature';
+        terrainType = 'Steep';
+        tags.add('Hiking');
+        attractions = ['Summit View', 'Waterfall', 'Forest Trails'];
+        activities = ['Hiking', 'Trekking', 'Photography', 'Camping'];
+        tips = [
+          'Start early to avoid heat',
+          'Bring plenty of water',
+          'Wear hiking boots',
+        ];
       }
-    } else if (category == 'historic') {
-      appCategory = 'Culture';
+    } else if (types.contains('museum') ||
+        types.contains('place_of_worship') ||
+        types.contains('hindu_temple') ||
+        types.contains('mosque') ||
+        types.contains('church')) {
+      category = 'Culture';
       physicalDemand = 'Low';
-      terrainType = 'Flat'; // Museums/ruins usually flat-ish
-    } else if (type == 'island') {
-      appCategory = 'Beach';
-      childFriendly = true;
-      elderFriendly = false; // Boat access usually required
-      terrainType = 'Mixed';
-    } else if (type == 'theme_park' || type == 'attraction') {
-      appCategory = 'Adventure';
-      childFriendly = true;
-      elderFriendly = true;
-      physicalDemand = 'Medium'; // Lots of walking
+      tags.add('Heritage');
+      attractions = ['Main Hall', 'Exhibits', 'Architecture'];
+      activities = ['Guided Tour', 'Cultural Learning', 'Quiet Reflection'];
+      tips = [
+        'Dress modestly',
+        'Respect the silence',
+        'Check if photography is allowed',
+      ];
+    } else if (types.contains('amusement_park') ||
+        types.contains('theme_park')) {
+      category = 'Adventure';
+      physicalDemand = 'Medium';
+      tags.add('Theme Park');
+      attractions = ['Roller Coasters', 'Kids Zone', 'Live Shows'];
+      activities = ['Rides', 'Games', 'Dining', 'Shopping'];
+      tips = [
+        'Buy tickets online to skip queues',
+        'Arrive early',
+        'Wear comfortable clothes',
+      ];
+    } else if (types.contains('restaurant') || types.contains('food')) {
+      category = 'Food';
+      tags.add('Foodie');
+      attractions = ['Dining Area', 'Open Kitchen', 'Bar'];
+      activities = ['Fine Dining', 'Tasting', 'Socializing'];
+      tips = [
+        'Make a reservation',
+        'Try the signature dish',
+        'Check dress code',
+      ];
+    } else if (types.contains('shopping_mall')) {
+      category = 'City';
+      tags.add('Shopping');
+      attractions = ['Cinema', 'Food Court', 'Retail Stores'];
+      activities = ['Shopping', 'Dining', 'Movie Watching'];
+      tips = [
+        'Great for rainy days',
+        'Sales usually happen on weekends',
+        'Parking can be full',
+      ];
     }
 
-    // fallback image (since API doesn't give nice photos)
-    // IF imageUrl is provided (from Wikipedia), use that. Else fallback.
-    String finalImage = imageUrl ?? _getFallbackImage(appCategory);
+    // 3. Image Handling
+    String image = _getFallbackImage(category);
+    String? photoRef;
+
+    final List<dynamic>? photos = place['photos'];
+    if (photos != null && photos.isNotEmpty) {
+      final firstPhoto = photos.first;
+      final String photoName =
+          firstPhoto['name']; // usage: places/PLACE_ID/photos/PHOTO_ID
+      photoRef = photoName;
+      image = _buildPhotoUrl(photoName);
+    }
+
+    // 4. Detailed Description (Editorial Summary)
+    String about = 'Discovered via Google Places. $address';
+    if (place['editorialSummary'] != null) {
+      about = place['editorialSummary']['text'] ?? about;
+    }
 
     return Destination(
       name: name,
-      state: fullState,
-      category: appCategory,
-      image: finalImage, // Placeholder or mapping
-      rating: 4.5, // Default rating for new discoveries
+      state: state,
+      category: category,
+      image: image,
+      rating: 4.5, // Default for new places
       bestTime: 'Year-round',
-      avgCost: 'RM 300 - RM 1,000',
-      duration: '2-3 days',
-      about:
-          'Discovered via OpenStreetMap. A great place for $appCategory lovers.',
-      highlights: [appCategory, type, 'Exploring'],
+      avgCost: 'RM 50 - RM 200', // Estimate
+      duration: '2-4 hours', // Estimate
+      about: about,
+      highlights: tags,
       bestMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-      tags: [appCategory, type.toUpperCase(), 'New Discovery'],
-
-      // Enriched Data
+      tags: tags,
       childFriendly: childFriendly,
       elderFriendly: elderFriendly,
       physicalDemand: physicalDemand,
       terrainType: terrainType,
       platformVariant: 'mobile',
       isCurated: false,
+      placeId: id,
+      photoReference: photoRef,
+      attractions: attractions,
+      activities: activities,
+      tips: tips,
     );
   }
 

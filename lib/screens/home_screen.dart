@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         return _home();
       case 1:
-        return const ExploreScreen();
+        return ExploreScreen(onBack: () => setState(() => _currentIndex = 0));
       case 2:
         return const GroupsScreen();
       case 3:
@@ -611,7 +611,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (daysLeft < 0 && trip.endDate.isBefore(DateTime.now()))
       badgeText = "COMPLETED";
 
-    String imageUrl = _getImageForDestination(trip.destination);
+    String imageUrl = (trip.imageUrl != null && trip.imageUrl!.isNotEmpty)
+        ? trip.imageUrl!
+        : _getImageForDestination(trip.destination);
 
     return GestureDetector(
       onTap: () {
@@ -723,7 +725,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // For "Shared Trips"
   // ===============================================================
   Widget _sharedTripGridCard(Trip trip) {
-    String imageUrl = _getImageForDestination(trip.destination);
+    String imageUrl = (trip.imageUrl != null && trip.imageUrl!.isNotEmpty)
+        ? trip.imageUrl!
+        : _getImageForDestination(trip.destination);
 
     return GestureDetector(
       onTap: () {

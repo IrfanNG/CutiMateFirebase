@@ -262,30 +262,37 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
   /// Switches UI display content according to selected tab
   Widget _getContentBody() {
+    final d = widget.destination;
+
     switch (selectedTab) {
       case 0:
         return _overview();
       case 1:
-        return _simpleList([
-          'Pantai Cenang',
-          'Langkawi Cable Car',
-          'Kilim Geoforest Park',
-          'Eagle Square',
-        ]);
+        return _simpleList(
+          d.attractions.isNotEmpty
+              ? d.attractions
+              : [
+                  'Explore the surroundings',
+                  'Local landmarks',
+                  'Photo opportunities',
+                ],
+        );
       case 2:
-        return _simpleList([
-          'Island hopping',
-          'Snorkeling',
-          'Jet ski',
-          'Mangrove tour',
-        ]);
+        return _simpleList(
+          d.activities.isNotEmpty
+              ? d.activities
+              : ['Sightseeing', 'Relaxing', 'Walking'],
+        );
       case 3:
-        return _simpleList([
-          'Best visited outside monsoon',
-          'Rent a car or scooter',
-          'Bring cash for island trips',
-          'Book activities early',
-        ]);
+        return _simpleList(
+          d.tips.isNotEmpty
+              ? d.tips
+              : [
+                  'Check opening hours',
+                  'Wear comfortable shoes',
+                  'Stay hydrated',
+                ],
+        );
       default:
         return const SizedBox();
     }
@@ -525,7 +532,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
               context,
               MaterialPageRoute(
                 builder: (_) =>
-                    CreateTripStep1(presetDestination: destination.name),
+                    CreateTripStep1(presetDestinationObj: widget.destination),
               ),
             );
           },

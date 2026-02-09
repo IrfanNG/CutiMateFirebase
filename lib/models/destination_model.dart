@@ -12,9 +12,26 @@ class Destination {
   final List<int> bestMonths; // 1 = Jan, 12 = Dec
   final List<String> tags; // e.g. "Best during dry season"
 
+  final bool childFriendly;
+  final bool elderFriendly;
+  final String physicalDemand;
+  final String terrainType;
+  final bool? isCurated;
+  final String? platformVariant;
+
+  // Google Places Integration
+  final String? placeId;
+  final String? photoReference;
+
+  // Detailed fields (New)
+  final List<String> attractions;
+  final List<String> activities;
+  final List<String> tips;
+
   Destination({
     required this.name,
     required this.state,
+    required this.category,
     required this.image,
     required this.rating,
     required this.bestTime,
@@ -22,22 +39,18 @@ class Destination {
     required this.duration,
     required this.about,
     required this.highlights,
-    required this.category,
-    this.bestMonths = const [],
-    this.tags = const [],
     this.childFriendly = true,
     this.elderFriendly = true,
-    this.physicalDemand = 'Low', // Low, Medium, High
-    this.terrainType = 'Flat', // Flat, Mixed, Steep
+    this.physicalDemand = 'Low',
+    this.terrainType = 'Flat',
+    this.bestMonths = const [],
     this.platformVariant = 'mobile',
-    this.isCurated =
-        false, // Default to false (generated), true for static data
+    this.tags = const [],
+    this.isCurated = true,
+    this.placeId,
+    this.photoReference,
+    this.attractions = const [],
+    this.activities = const [],
+    this.tips = const [],
   });
-
-  final bool childFriendly;
-  final bool elderFriendly;
-  final String physicalDemand;
-  final String terrainType;
-  final bool? isCurated;
-  final String? platformVariant;
 }

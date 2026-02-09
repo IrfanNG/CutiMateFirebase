@@ -108,7 +108,9 @@ class AllTripsScreen extends StatelessWidget {
   }
 
   Widget _buildTripCard(BuildContext context, Trip trip) {
-    String imageUrl = _getImageForDestination(trip.destination);
+    String imageUrl = (trip.imageUrl != null && trip.imageUrl!.isNotEmpty)
+        ? trip.imageUrl!
+        : _getImageForDestination(trip.destination);
 
     return GestureDetector(
       onTap: () {

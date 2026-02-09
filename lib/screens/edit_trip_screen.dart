@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/trip_model.dart';
+import '../services/destination_service.dart';
 
 /// ===============================================================
 /// EDIT TRIP SCREEN (REDESIGNED)
@@ -50,20 +51,11 @@ class _EditTripScreenState extends State<EditTripScreen> {
     endDate = widget.trip.endDate;
   }
 
+  // ... (inside _EditTripScreenState)
+
   // UPDATE LOGIC
   Future<void> updateTrip() async {
     if (!formKey.currentState!.validate()) return;
-
-    final updatedTrip = widget.trip.copyWith(
-      title: title.text,
-      destination: destination.text,
-      travelers: int.parse(travelers.text),
-      transport: transport.text,
-      accommodation: accommodation.text,
-      budget: double.parse(budget.text),
-      startDate: startDate,
-      endDate: endDate,
-    );
 
     // Show loading
     showDialog(
@@ -74,6 +66,35 @@ class _EditTripScreenState extends State<EditTripScreen> {
           valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF7F50)),
         ),
       ),
+    );
+
+    String? newImageUrl = widget.trip.imageUrl;
+
+    // Cascading Update: If destination changed, fetch new image
+    if (destination.text.trim().toLowerCase() !=
+        widget.trip.destination.trim().toLowerCase()) {
+      try {
+        final results = await DestinationService.searchDestinations(
+          destination.text.trim(),
+        );
+        if (results.isNotEmpty) {
+          newImageUrl = results.first.image;
+        }
+      } catch (e) {
+        debugPrint("Error fetching new image: $e");
+      }
+    }
+
+    final updatedTrip = widget.trip.copyWith(
+      title: title.text,
+      destination: destination.text,
+      travelers: int.parse(travelers.text),
+      transport: transport.text,
+      accommodation: accommodation.text,
+      budget: double.parse(budget.text),
+      startDate: startDate,
+      endDate: endDate,
+      imageUrl: newImageUrl,
     );
 
     await FirebaseFirestore.instance

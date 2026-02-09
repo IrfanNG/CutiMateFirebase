@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'create_trip_step3.dart';
 
-import '../data/destination_data.dart';
+import '../models/destination_model.dart';
 
 /// =======================================================
 /// CREATE TRIP – STEP 2
@@ -9,7 +9,7 @@ import '../data/destination_data.dart';
 /// Includes Smart Recommendations based on group composition.
 /// =======================================================
 class CreateTripStep2 extends StatefulWidget {
-  final String destination; // Destination chosen in Step 1
+  final Destination destination; // Destination chosen in Step 1
   final DateTime startDate; // Start date from Step 1
   final DateTime endDate; // End date from Step 1
 
@@ -380,12 +380,8 @@ class _CreateTripStep2State extends State<CreateTripStep2> {
   List<String> _getWarnings() {
     List<String> warnings = [];
 
-    // Find destination metadata
-    // In a real app, this might be an ID lookup. Here we match by name.
-    final dest = allDestinations.firstWhere(
-      (d) => d.name.toLowerCase() == widget.destination.toLowerCase(),
-      orElse: () => allDestinations.first, // Fallback if custom destination
-    );
+    // Use the passed destination object directly
+    final dest = widget.destination;
 
     // Rule 1: Elderly & Physical Demand
     if (elderly > 0 && dest.physicalDemand == 'High') {
@@ -460,7 +456,7 @@ class _CreateTripStep2State extends State<CreateTripStep2> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                "Great choice! ${widget.destination} is suitable for your group.",
+                "Great choice! ${widget.destination.name} is suitable for your group.",
                 style: TextStyle(
                   color: Colors.green.shade900,
                   fontWeight: FontWeight.bold,
