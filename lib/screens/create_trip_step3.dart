@@ -365,6 +365,10 @@ class _CreateTripStep3State extends State<CreateTripStep3> {
     /// Save trip to Firestore
     await TripService.saveTrip(trip);
 
+    if (!mounted) {
+      return;
+    }
+
     /// Navigate user back to Home
     Navigator.pushAndRemoveUntil(
       context,

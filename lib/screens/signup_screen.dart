@@ -85,7 +85,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [const Color(0xFFFF7F50).withOpacity(0.1), Colors.white],
+            colors: [
+              const Color(0xFFFF7F50).withValues(alpha: 0.1),
+              Colors.white,
+            ],
           ),
         ),
         child: SafeArea(
@@ -147,7 +150,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       backgroundColor: const Color(0xFFFF7F50),
                       foregroundColor: Colors.white,
                       elevation: 5,
-                      shadowColor: const Color(0xFFFF7F50).withOpacity(0.5),
+                      shadowColor: const Color(
+                        0xFFFF7F50,
+                      ).withValues(alpha: 0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -208,7 +213,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       obscureText: isPassword,
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(icon, color: const Color(0xFFFF7F50).withOpacity(0.7)),
+        prefixIcon: Icon(
+          icon,
+          color: const Color(0xFFFF7F50).withValues(alpha: 0.7),
+        ),
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(

@@ -119,7 +119,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 setState(() => tasks.add(TaskItem(title: t.text.trim())));
                 await _saveToFirestore();
               }
-              Navigator.pop(context);
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
             },
             child: const Text("Add"),
           ),
@@ -239,9 +241,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       pinned: true,
       stretch: true,
       leading: Container(
-        margin: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.3),
+          color: Colors.white.withValues(alpha: 0.3),
           shape: BoxShape.circle,
         ),
         child: const BackButton(color: Colors.white),
@@ -250,7 +252,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         Container(
           margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.3),
+            color: Colors.white.withValues(alpha: 0.3),
             shape: BoxShape.circle,
           ),
           child: IconButton(
@@ -267,7 +269,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         Container(
           margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.3),
+            color: Colors.white.withValues(alpha: 0.3),
             shape: BoxShape.circle,
           ),
           child: PopupMenuButton<String>(
@@ -340,7 +342,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                     ? widget.trip.imageUrl!
                     : _getImageForDestination(widget.trip.destination),
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   color: Colors.grey.shade300,
                   child: const Center(
                     child: Icon(Icons.image_not_supported, color: Colors.grey),
@@ -356,7 +358,10 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.black.withOpacity(0.4), Colors.transparent],
+                    colors: [
+                      Colors.black.withValues(alpha: 0.4),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
               ),
@@ -369,12 +374,15 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 
   String _getImageForDestination(String destination) {
     String lower = destination.toLowerCase();
-    if (lower.contains('bali'))
+    if (lower.contains('bali')) {
       return 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1000';
-    if (lower.contains('kyoto'))
+    }
+    if (lower.contains('kyoto')) {
       return 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1000';
-    if (lower.contains('paris'))
+    }
+    if (lower.contains('paris')) {
       return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1000';
+    }
     return 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=2070&auto=format&fit=crop';
   }
 
@@ -406,7 +414,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF7F50).withOpacity(0.1),
+                  color: const Color(0xFFFF7F50).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -582,7 +590,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 const SizedBox(height: 16),
               ],
             );
-          }).toList(),
+          }),
 
           const SizedBox(height: 24),
         ],
@@ -617,7 +625,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 ),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: const Color(0xFFFF7F50).withOpacity(0.1),
+                    backgroundColor: const Color(
+                      0xFFFF7F50,
+                    ).withValues(alpha: 0.1),
                     foregroundColor: const Color(0xFFFF7F50),
                     child: Text(
                       m.isNotEmpty ? m[0].toUpperCase() : '?',
@@ -638,10 +648,14 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF7F50).withOpacity(0.1),
+                            color: const Color(
+                              0xFFFF7F50,
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: const Color(0xFFFF7F50).withOpacity(0.3),
+                              color: const Color(
+                                0xFFFF7F50,
+                              ).withValues(alpha: 0.3),
                             ),
                           ),
                           child: const Text(
@@ -831,7 +845,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   .doc(widget.trip.id)
                   .update({"members": members});
 
-              Navigator.pop(context);
+              if (mounted) {
+                Navigator.pop(context);
+              }
             },
             child: const Text("Remove"),
           ),
@@ -876,7 +892,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -921,7 +937,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
+                        color: Colors.green.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -988,7 +1004,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                             }
                           }
                         } catch (e) {
-                          if (context.mounted) {
+                          if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text("Could not launch maps"),
@@ -1050,14 +1066,18 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     String lower = title.toLowerCase();
     if (lower.contains('food') ||
         lower.contains('lunch') ||
-        lower.contains('dinner'))
+        lower.contains('dinner')) {
       return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1000';
-    if (lower.contains('hotel') || lower.contains('check-in'))
+    }
+    if (lower.contains('hotel') || lower.contains('check-in')) {
       return 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1000';
-    if (lower.contains('beach'))
+    }
+    if (lower.contains('beach')) {
       return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000';
-    if (lower.contains('temple'))
+    }
+    if (lower.contains('temple')) {
       return 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1000';
+    }
 
     return 'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?q=80&w=1000'; // Default resorty
   }
@@ -1082,7 +1102,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               children: [
                 // Day Dropdown
                 DropdownButtonFormField<int>(
-                  value: selectedDay,
+                  initialValue: selectedDay,
                   decoration: const InputDecoration(labelText: "Day"),
                   items: List.generate(widget.trip.days, (index) {
                     int day = index + 1;
@@ -1217,6 +1237,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 ),
               );
               await _saveToFirestore();
+              if (!mounted) return;
               Navigator.pop(context);
             },
             child: const Text("Save"),
@@ -1266,7 +1287,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   decoration: const InputDecoration(labelText: "Category"),
                   items: categories
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -1301,6 +1322,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 );
               });
               await _saveToFirestore();
+              if (!mounted) return;
               Navigator.pop(context);
             },
             child: const Text("Add"),
@@ -1329,7 +1351,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               children: [
                 // Day Dropdown
                 DropdownButtonFormField<int>(
-                  value: selectedDay,
+                  initialValue: selectedDay,
                   decoration: const InputDecoration(labelText: "Day"),
                   items: List.generate(widget.trip.days, (index) {
                     int day = index + 1;
@@ -1456,6 +1478,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 ),
               );
               await _saveToFirestore();
+              if (!mounted) return;
               Navigator.pop(context);
             },
             child: const Text("Add"),
@@ -1471,7 +1494,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     final bool isOwner = widget.trip.ownerUid == user.uid;
 
     // Calculate Total Spent
-    final totalSpent = expenses.fold(0.0, (sum, e) => sum + e.amount);
+    final totalSpent = expenses.fold(0.0, (prev, e) => prev + e.amount);
     final remaining = widget.trip.budget - totalSpent;
 
     // Calculate My Allocations
@@ -1711,7 +1734,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   decoration: const InputDecoration(labelText: "Category"),
                   items: categories
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -1745,7 +1768,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               });
 
               await _saveToFirestore();
-              Navigator.pop(context);
+              if (mounted) {
+                Navigator.pop(context);
+              }
             },
             child: const Text("Save"),
           ),
@@ -1825,7 +1850,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             onPressed: () async {
               setState(() => checklist[i].title = t.text);
               await _saveToFirestore();
-              Navigator.pop(context);
+              if (mounted) {
+                Navigator.pop(context);
+              }
             },
             child: const Text("Save"),
           ),
@@ -1910,7 +1937,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               });
 
               await _saveToFirestore();
-              Navigator.pop(context);
+              if (mounted) {
+                Navigator.pop(context);
+              }
             },
             child: const Text("Save"),
           ),
@@ -2004,7 +2033,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   .doc(widget.trip.id)
                   .update({"members": members});
 
-              Navigator.pop(ctx);
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+              }
             },
             child: const Text("Invite"),
           ),
@@ -2039,7 +2070,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 setState(() => checklist.add(ChecklistItem(title: t.text)));
                 await _saveToFirestore();
               }
-              Navigator.pop(c);
+              if (c.mounted) {
+                Navigator.pop(c);
+              }
             },
             child: const Text("Save"),
           ),
@@ -2108,8 +2141,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   ...categories.map((cat) {
                     String currentAssignment =
                         widget.trip.categoryAssignments[cat] ?? 'Split Equally';
-                    if (!assignableMembers.contains(currentAssignment))
+                    if (!assignableMembers.contains(currentAssignment)) {
                       currentAssignment = 'Split Equally';
+                    }
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -2132,7 +2166,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                                   m == 'Split Equally'
                                       ? m
                                       : (m.length > 10
-                                            ? m.substring(0, 8) + "..."
+                                            ? "${m.substring(0, 8)}..."
                                             : m),
                                 ),
                               );
@@ -2150,7 +2184,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                   const SizedBox(height: 20),
                 ],
               ),

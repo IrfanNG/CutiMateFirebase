@@ -1,39 +1,10 @@
 {
-  "flutter": {
-    "platforms": {
-      "android": {
-        "default": {
-          "projectId": "cutimate-97bd4",
-          "appId": "1:245769007460:android:31ae7a16292e9c325a8a71",
-          "fileOutput": "android/app/google-services.json"
-        }
-      },
-      "dart": {
-        "lib/firebase_options.dart": {
-          "projectId": "cutimate-97bd4",
-          "configurations": {
-            "android": "1:245769007460:android:31ae7a16292e9c325a8a71",
-            "ios": "1:245769007460:ios:d59f667f91535c2e5a8a71",
-            "macos": "1:245769007460:ios:d59f667f91535c2e5a8a71",
-            "web": "1:245769007460:web:ee00602879d03b955a8a71",
-            "windows": "1:245769007460:web:4875f96386944dce5a8a71"
-          }
-        }
-      }
-    }
-  },
   "hosting": {
     "public": "build/web",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
     ]
   }
 }

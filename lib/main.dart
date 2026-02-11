@@ -1,14 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'services/auth_wrapper.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const MyApp());
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    runApp(const MyApp());
+  } catch (e, stack) {
+    runApp(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Container(
+          color: Colors.white,
+          padding: const EdgeInsets.all(20),
+          alignment: Alignment.center,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  "App Initialization Error",
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  "$e",
+                  style: const TextStyle(color: Colors.black87, fontSize: 16),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  "$stack",
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -26,7 +68,7 @@ class MyApp extends StatelessWidget {
           primary: const Color(0xFFFF7F50),
           secondary: Colors.grey.shade700,
           surface: Colors.white,
-          background: const Color(0xFFF9FAFB), // Soft off-white
+          surfaceContainerHighest: const Color(0xFFF9FAFB), // Soft off-white
         ),
         scaffoldBackgroundColor: const Color(0xFFF9FAFB),
         appBarTheme: const AppBarTheme(
@@ -84,22 +126,7 @@ class MyApp extends StatelessWidget {
         ),
         fontFamily: 'Roboto', // Or preferred font
       ),
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          if (snapshot.hasData) {
-            return const HomeScreen(); // already logged in
-          }
-
-          return const LoginScreen(); // not logged in
-        },
-      ),
+      home: const AuthWrapper(),
     );
   }
 }

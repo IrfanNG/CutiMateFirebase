@@ -67,7 +67,7 @@ class BudgetOverviewScreen extends StatelessWidget {
           /// Calculate total budget + total spending
           for (final trip in trips) {
             totalBudget += trip.budget;
-            totalSpent += trip.expenses.fold(0.0, (sum, e) => sum + e.amount);
+            totalSpent += trip.expenses.fold(0.0, (prev, e) => prev + e.amount);
           }
 
           /// Remaining balance across all trips
@@ -99,7 +99,7 @@ class BudgetOverviewScreen extends StatelessWidget {
                     ...trips.map((trip) {
                       final spent = trip.expenses.fold(
                         0.0,
-                        (sum, e) => sum + e.amount,
+                        (prev, e) => prev + e.amount,
                       );
 
                       return _tripBudgetCard(context, trip, spent);
@@ -186,7 +186,7 @@ class BudgetOverviewScreen extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(color: color.withOpacity(0.6), fontSize: 12),
+          style: TextStyle(color: color.withValues(alpha: 0.6), fontSize: 12),
         ),
         const SizedBox(height: 4),
         Text(

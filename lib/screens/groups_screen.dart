@@ -108,8 +108,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(0.2),
-                  Colors.black.withOpacity(0.6),
+                  Colors.black.withValues(alpha: 0.2),
+                  Colors.black.withValues(alpha: 0.6),
                 ],
               ),
             ),
@@ -160,7 +160,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFFF7F50).withOpacity(0.4),
+                    color: const Color(0xFFFF7F50).withValues(alpha: 0.4),
                     blurRadius: 12,
                     offset: const Offset(0, 6),
                   ),
@@ -198,7 +198,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -230,7 +230,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -372,18 +372,24 @@ class _GroupsScreenState extends State<GroupsScreen> {
 
   String _getImageForDestination(String destination) {
     String lower = destination.toLowerCase();
-    if (lower.contains('bali'))
+    if (lower.contains('bali')) {
       return 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1000';
-    if (lower.contains('kyoto'))
+    }
+    if (lower.contains('kyoto')) {
       return 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1000';
-    if (lower.contains('paris'))
+    }
+    if (lower.contains('paris')) {
       return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1000';
-    if (lower.contains('tokyo'))
+    }
+    if (lower.contains('tokyo')) {
       return 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1000';
-    if (lower.contains('new york'))
+    }
+    if (lower.contains('new york')) {
       return 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1000';
-    if (lower.contains('london'))
+    }
+    if (lower.contains('london')) {
       return 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=1000';
+    }
     // Default
     return 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=1000';
   }

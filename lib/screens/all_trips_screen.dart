@@ -98,7 +98,7 @@ class AllTripsScreen extends StatelessWidget {
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: trips.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 16),
+          separatorBuilder: (_, _) => const SizedBox(height: 16),
           itemBuilder: (context, index) {
             return _buildTripCard(context, trips[index]);
           },
@@ -126,7 +126,7 @@ class AllTripsScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -143,7 +143,7 @@ class AllTripsScreen extends StatelessWidget {
                 width: 120,
                 height: 120,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                     Container(color: Colors.grey.shade300, width: 120),
               ),
             ),
@@ -196,12 +196,15 @@ class AllTripsScreen extends StatelessWidget {
 
   String _getImageForDestination(String destination) {
     String lower = destination.toLowerCase();
-    if (lower.contains('bali'))
+    if (lower.contains('bali')) {
       return 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1000';
-    if (lower.contains('kyoto'))
+    }
+    if (lower.contains('kyoto')) {
       return 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1000';
-    if (lower.contains('paris'))
+    }
+    if (lower.contains('paris')) {
       return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1000';
+    }
     return 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=2070&auto=format&fit=crop';
   }
 

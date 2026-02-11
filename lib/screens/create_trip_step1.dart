@@ -397,7 +397,7 @@ class _CreateTripStep1State extends State<CreateTripStep1> {
         border: Border.all(color: Colors.grey.shade300),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -434,7 +434,7 @@ class _CreateTripStep1State extends State<CreateTripStep1> {
           boxShadow: hasValue
               ? [
                   BoxShadow(
-                    color: const Color(0xFFFF7F50).withOpacity(0.3),
+                    color: const Color(0xFFFF7F50).withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -449,7 +449,9 @@ class _CreateTripStep1State extends State<CreateTripStep1> {
             Text(
               label,
               style: TextStyle(
-                color: hasValue ? Colors.white.withOpacity(0.9) : Colors.grey,
+                color: hasValue
+                    ? Colors.white.withValues(alpha: 0.9)
+                    : Colors.grey,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
@@ -568,7 +570,7 @@ class _CreateTripStep1State extends State<CreateTripStep1> {
             borderRadius: BorderRadius.circular(16),
           ),
           elevation: 0,
-          shadowColor: const Color(0xFFFF7F50).withOpacity(0.4),
+          shadowColor: const Color(0xFFFF7F50).withValues(alpha: 0.4),
         ),
 
         /// Button text

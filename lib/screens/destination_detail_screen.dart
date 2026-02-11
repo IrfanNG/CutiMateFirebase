@@ -114,9 +114,9 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(0.3),
+                  Colors.black.withValues(alpha: 0.3),
                   Colors.transparent,
-                  Colors.black.withOpacity(0.6),
+                  Colors.black.withValues(alpha: 0.6),
                 ],
               ),
             ),
@@ -363,7 +363,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
                       Text(
                         "This destination was found via search. Suitability for children, elderly, or terrain details are not verified.",
                         style: TextStyle(
-                          color: Colors.orange.shade900.withOpacity(0.8),
+                          color: Colors.orange.shade900.withValues(alpha: 0.8),
                           fontSize: 12,
                           height: 1.4,
                         ),
@@ -509,7 +509,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),
@@ -521,7 +521,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFFF7F50),
             minimumSize: const Size.fromHeight(56),
-            shadowColor: const Color(0xFFFF7F50).withOpacity(0.5),
+            shadowColor: const Color(0xFFFF7F50).withValues(alpha: 0.5),
             elevation: 5,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),

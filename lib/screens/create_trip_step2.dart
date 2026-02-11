@@ -639,7 +639,7 @@ class _CreateTripStep2State extends State<CreateTripStep2> {
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: const Color(0xFFFF7F50).withOpacity(0.3),
+                    color: const Color(0xFFFF7F50).withValues(alpha: 0.3),
                     spreadRadius: 1,
                     blurRadius: 8,
                     offset: const Offset(0, 2),

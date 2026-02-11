@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'home_screen.dart';
+
 import 'signup_screen.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,16 +25,13 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       setState(() => _loading = true);
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final authService = AuthService();
+      await authService.signInWithEmailPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      // AuthWrapper will handle navigation
     } on FirebaseAuthException catch (e) {
       String message = 'Login failed';
 
@@ -46,6 +44,21 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       _showAlert(message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _loading = true);
+    try {
+      final authService = AuthService();
+      await authService.signInWithGoogle();
+      // AuthWrapper handles navigation
+    } catch (e) {
+      if (mounted) {
+        _showAlert("Google Sign-In Failed: $e");
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -78,7 +91,10 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [const Color(0xFFFF7F50).withOpacity(0.1), Colors.white],
+            colors: [
+              const Color(0xFFFF7F50).withValues(alpha: 0.1),
+              Colors.white,
+            ],
           ),
         ),
         child: SafeArea(
@@ -91,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFF7F50).withOpacity(0.1),
+                    color: const Color(0xFFFF7F50).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -124,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     hintStyle: TextStyle(color: Colors.grey.shade400),
                     prefixIcon: Icon(
                       Icons.email_outlined,
-                      color: const Color(0xFFFF7F50).withOpacity(0.7),
+                      color: const Color(0xFFFF7F50).withValues(alpha: 0.7),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -159,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     hintStyle: TextStyle(color: Colors.grey.shade400),
                     prefixIcon: Icon(
                       Icons.lock_outline_rounded,
-                      color: const Color(0xFFFF7F50).withOpacity(0.7),
+                      color: const Color(0xFFFF7F50).withValues(alpha: 0.7),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -198,7 +214,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      shadowColor: const Color(0xFFFF7F50).withOpacity(0.5),
+                      shadowColor: const Color(
+                        0xFFFF7F50,
+                      ).withValues(alpha: 0.5),
                       elevation: 5,
                     ),
                     child: _loading
@@ -210,6 +228,43 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey.shade300)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        "OR",
+                        style: TextStyle(color: Colors.grey.shade500),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey.shade300)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _handleGoogleSignIn,
+                    icon: const Icon(Icons.g_mobiledata, size: 32),
+                    label: const Text(
+                      "Sign in with Google",
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.black87,
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
                   ),
                 ),
 

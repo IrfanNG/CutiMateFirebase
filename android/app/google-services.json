@@ -12,7 +12,20 @@
           "package_name": "com.example.cutimateapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "245769007460-6jb9n6d486ikthgl75ug0amem3911hse.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.cutimateapp",
+            "certificate_hash": "c6a5357458efa8179905a90d1181ef7f87855ed8"
+          }
+        },
+        {
+          "client_id": "245769007460-vt7qvfc7etoit3lut2n7hdnsjltk8dpq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAYO1XS6X8q03tKsnivlELoguAvr3lwQ9M"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "245769007460-vt7qvfc7etoit3lut2n7hdnsjltk8dpq.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "245769007460-9188nijupv9hm7c0v2bb8e1kf1l22cfi.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.cutimateapp"
+              }
+            }
+          ]
         }
       }
     }

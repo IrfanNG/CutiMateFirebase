@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../models/destination_model.dart';
 import '../data/destination_data.dart';
 
@@ -60,13 +61,13 @@ class DestinationService {
 
         return results;
       } else {
-        print(
+        debugPrint(
           'Google Places API Error: ${response.statusCode} - ${response.body}',
         );
         return [];
       }
     } catch (e) {
-      print("API Error: $e");
+      debugPrint("API Error: $e");
       return [];
     }
   }
@@ -165,7 +166,7 @@ class DestinationService {
 
       return finalResults;
     } catch (e) {
-      print("API Error: $e");
+      debugPrint("API Error: $e");
       return allDestinations; // Fallback only on critical error
     }
   }
@@ -233,16 +234,17 @@ class DestinationService {
         if (seedResults.isNotEmpty) {
           final seed = seedResults.first;
           // Use category to broaden search
-          if (seed.category == 'Beach')
+          if (seed.category == 'Beach') {
             searchQuery = "Islands and beaches Malaysia";
-          else if (seed.category == 'Nature')
+          } else if (seed.category == 'Nature') {
             searchQuery = "Nature parks Malaysia";
-          else if (seed.category == 'Adventure')
+          } else if (seed.category == 'Adventure') {
             searchQuery = "Adventure activities Malaysia";
-          else if (seed.category == 'City')
+          } else if (seed.category == 'City') {
             searchQuery = "Cities in Malaysia";
-          else if (seed.category == 'Culture')
+          } else if (seed.category == 'Culture') {
             searchQuery = "Cultural sites Malaysia";
+          }
         }
       } catch (e) {
         // failed to get details, stick to default
@@ -283,7 +285,7 @@ class DestinationService {
 
       return finalReturn.take(5).toList();
     } catch (e) {
-      print("Error finding similar: $e");
+      debugPrint("Error finding similar: $e");
       return getPopularDestinations();
     }
   }

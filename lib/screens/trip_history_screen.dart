@@ -48,7 +48,7 @@ class TripHistoryScreen extends StatelessWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
                   itemCount: pastTrips.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  separatorBuilder: (_, _) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final trip = pastTrips[index];
                     return _tripCard(context, trip);
@@ -71,7 +71,7 @@ class TripHistoryScreen extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -127,7 +127,7 @@ class TripHistoryScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -154,7 +154,7 @@ class TripHistoryScreen extends StatelessWidget {
                           width: 50,
                           height: 50,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             width: 50,
                             height: 50,
                             color: Colors.grey.shade200,
@@ -298,7 +298,7 @@ class TripHistoryScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(30),
             decoration: BoxDecoration(
-              color: const Color(0xFFFF7F50).withOpacity(0.1),
+              color: const Color(0xFFFF7F50).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(

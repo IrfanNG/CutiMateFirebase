@@ -202,7 +202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: accentYellow.withOpacity(0.3),
+                    color: accentYellow.withValues(alpha: 0.3),
                     width: 3,
                   ),
                 ),
@@ -215,7 +215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: Colors.grey.shade100,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     ),
@@ -278,7 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF7F50).withOpacity(0.3),
+              color: const Color(0xFFFF7F50).withValues(alpha: 0.3),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -386,7 +386,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           border: Border.all(color: Colors.grey.shade100),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.01),
+              color: Colors.black.withValues(alpha: 0.01),
               blurRadius: 5,
               offset: const Offset(0, 2),
             ),
@@ -400,7 +400,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: danger ? Colors.red.withOpacity(0.1) : Colors.grey.shade50,
+              color: danger
+                  ? Colors.red.withValues(alpha: 0.1)
+                  : Colors.grey.shade50,
               shape: BoxShape.circle,
             ),
             child: Icon(

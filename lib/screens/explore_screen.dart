@@ -120,8 +120,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           final filtered = allDestinations.where((d) {
                             // Map category names if needed
                             String checkCat = selectedCategory;
-                            if (checkCat == 'All Destinations')
+                            if (checkCat == 'All Destinations') {
                               checkCat = 'All';
+                            }
 
                             final matchCategory =
                                 checkCat == 'All' || d.category == checkCat;
@@ -229,7 +230,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -343,7 +344,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 width: 40,
                                 height: 40,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
+                                errorBuilder: (_, _, _) => Container(
                                   width: 40,
                                   height: 40,
                                   color: Colors.grey.shade200,
@@ -483,7 +484,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -509,7 +510,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           fit: BoxFit.cover,
                           height: isLeft ? 260 : 200, // Staggered heights
                           width: double.infinity,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             height: 200,
                             color: Colors.grey.shade200,
                           ),
@@ -532,7 +533,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
@@ -715,7 +716,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.orange.withValues(alpha: 0.1),
                       blurRadius: 4,
                     ),
                   ],

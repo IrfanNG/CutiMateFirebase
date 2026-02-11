@@ -144,12 +144,14 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
             .doc(widget.tripId)
             .snapshots(),
         builder: (context, tripSnap) {
-          if (!tripSnap.hasData)
+          if (!tripSnap.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final tripData = tripSnap.data!.data() as Map<String, dynamic>?;
-          if (tripData == null)
+          if (tripData == null) {
             return const Center(child: Text("Trip not found"));
+          }
 
           // Get total members
           final members = List<String>.from(
@@ -251,14 +253,14 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [primaryOrange, primaryOrange.withOpacity(0.8)],
+          colors: [primaryOrange, primaryOrange.withValues(alpha: 0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: primaryOrange.withOpacity(0.4),
+            color: primaryOrange.withValues(alpha: 0.4),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -269,7 +271,7 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -283,10 +285,10 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   "Current Favorite",
                   style: TextStyle(
-                    color: Colors.white70,
+                    color: Color(0xFFFF7F50).withValues(alpha: 0.4),
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1,
@@ -346,12 +348,12 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black12,
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 10,
             offset: Offset(0, 5),
           ),
@@ -440,7 +442,7 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
               : Border.all(color: Colors.transparent, width: 2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -523,10 +525,12 @@ class _DestinationVoteScreenState extends State<DestinationVoteScreen> {
                                     backgroundColor:
                                         Colors.primaries[option["name"].length %
                                             Colors.primaries.length],
-                                    child: const Icon(
+                                    child: Icon(
                                       Icons.person,
                                       size: 12,
-                                      color: Colors.white,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.9,
+                                      ),
                                     ),
                                   ),
                                 ),

@@ -185,8 +185,8 @@ class _HomeScreenState extends State<HomeScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black.withOpacity(0.3),
-              Colors.black.withOpacity(0.1),
+              Colors.black.withValues(alpha: 0.3),
+              Colors.black.withValues(alpha: 0.1),
               Colors.transparent,
             ],
           ),
@@ -270,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
+                        color: Colors.white.withValues(alpha: 0.3),
                         shape: BoxShape.circle,
                       ),
                       child: const CircleAvatar(
@@ -299,17 +299,17 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95), // Glassmorphism-ish
+        color: Colors.white.withValues(alpha: 0.95), // Glassmorphism-ish
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 10),
             spreadRadius: -5,
           ),
         ],
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,7 +462,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   scrollDirection: Axis.horizontal,
                   itemCount: trips.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  separatorBuilder: (_, _) => const SizedBox(width: 16),
                   itemBuilder: (context, index) {
                     return _tripCard(trips[index]);
                   },
@@ -608,8 +608,9 @@ class _HomeScreenState extends State<HomeScreen> {
     String badgeText = daysLeft > 0
         ? "$daysLeft DAYS LEFT"
         : (daysLeft == 0 ? "TODAY" : "ONGOING");
-    if (daysLeft < 0 && trip.endDate.isBefore(DateTime.now()))
+    if (daysLeft < 0 && trip.endDate.isBefore(DateTime.now())) {
       badgeText = "COMPLETED";
+    }
 
     String imageUrl = (trip.imageUrl != null && trip.imageUrl!.isNotEmpty)
         ? trip.imageUrl!
@@ -629,7 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -650,7 +651,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 160,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
+                    errorBuilder: (_, _, _) =>
                         Container(color: Colors.grey.shade300, height: 160),
                   ),
                 ),
@@ -664,7 +665,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -742,7 +743,7 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -762,7 +763,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       imageUrl,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
+                      errorBuilder: (_, _, _) =>
                           Container(color: Colors.grey.shade200),
                     ),
                   ),
@@ -773,7 +774,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -831,18 +832,24 @@ class _HomeScreenState extends State<HomeScreen> {
   // Helper to get consistent placeholder images
   String _getImageForDestination(String destination) {
     String lower = destination.toLowerCase();
-    if (lower.contains('bali'))
+    if (lower.contains('bali')) {
       return 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=1000';
-    if (lower.contains('kyoto'))
+    }
+    if (lower.contains('kyoto')) {
       return 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1000';
-    if (lower.contains('paris'))
+    }
+    if (lower.contains('paris')) {
       return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1000';
-    if (lower.contains('tokyo'))
+    }
+    if (lower.contains('tokyo')) {
       return 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1000';
-    if (lower.contains('new york'))
+    }
+    if (lower.contains('new york')) {
       return 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1000';
-    if (lower.contains('london'))
+    }
+    if (lower.contains('london')) {
       return 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=1000';
+    }
 
     // Default random-ish based on length to be deterministic per load
     return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000';

@@ -63,6 +63,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '245769007460',
     projectId: 'cutimate-97bd4',
     storageBucket: 'cutimate-97bd4.firebasestorage.app',
+    iosClientId:
+        '245769007460-9188nijupv9hm7c0v2bb8e1kf1l22cfi.apps.googleusercontent.com',
     iosBundleId: 'com.example.cutimateapp',
   );
 
@@ -72,6 +74,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '245769007460',
     projectId: 'cutimate-97bd4',
     storageBucket: 'cutimate-97bd4.firebasestorage.app',
+    iosClientId:
+        '245769007460-9188nijupv9hm7c0v2bb8e1kf1l22cfi.apps.googleusercontent.com',
     iosBundleId: 'com.example.cutimateapp',
   );
 
